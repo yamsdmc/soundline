@@ -62,7 +62,8 @@ query
   - For **approximate** (ANN) backends, this is a recall target: on the shared contract fixtures, filtered recall@k against exact filtered search MUST be ≥ 0.95, **including** highly selective filters (< 1% of chunks match). Adapters reach this however they can, typically by falling back to an exact scan over the filtered rows when the filter is selective.
   - How a store applies filters (native index constraints, SQL pre-selection, exact scan) is an adapter concern, not a spec concern.
 - **RET-042** Filters on reserved keys `sl.document_id`, `sl.source`, `sl.media_type`, `sl.ingested_at` MUST be supported.
-- **RET-043** Filtering on an unknown key matches nothing (for `eq`, `in`, `exists`) rather than raising. A filter with a type mismatch (`gt` on a string key) raises `InvalidFilterError`.
+- **RET-043** A condition on a key that a document does not have is false, for every operator including `ne` and `nin`. Only `not` can make it true. Values of different types never match: `gt("type", 2023)` against a string value is false, not an error, because stores compare values without a schema. A **malformed** filter (unknown operator, wrong arity, a list where a single value is expected, ordering on a boolean, several operators in one object) raises `InvalidFilterError` (`invalid_filter`) when parsed, before any search runs.
+  > Revised in M2: the first version required `gt` on a string-typed key to raise. That cannot be implemented without a metadata schema, which Soundline does not have, so the type check moved to the value level (no match), and errors are reserved for malformed filters.
 - **RET-044** The filter language MUST have one canonical JSON form (shared by Python, CLI, HTTP and MCP). The Python API MAY offer a builder:
   ```python
   F.eq("type", "contract") & F.gte("year", 2023)

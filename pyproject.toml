@@ -78,6 +78,7 @@ select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF", "PT", "N", "C4", "PIE", "
 ignore = [
     "PLR2004",  # magic values in comparisons: worked examples in tests are intentional
     "TRY003",  # ARC-031 requires errors to carry an actionable message
+    "PLR0911",  # exhaustive match statements return once per case
 ]
 
 [tool.ruff.lint.per-file-ignores]
