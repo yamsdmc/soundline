@@ -1,0 +1,112 @@
+[project]
+name = "soundline"
+version = "0.0.0"
+description = "The eval-first RAG engine. Every answer cited. Every change measured."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "yamsdmc" }]
+keywords = ["rag", "retrieval", "llm", "evaluation", "citations", "search"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/soundline-dev/soundline"
+Documentation = "https://github.com/soundline-dev/soundline/tree/main/docs"
+Issues = "https://github.com/soundline-dev/soundline/issues"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-xdist>=3.6",
+    "pytest-socket>=0.7",
+    "hypothesis>=6.112",
+    "ruff>=0.13",
+    "pyright>=1.1.405",
+    "import-linter>=2.1",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/soundline"]
+
+# --- Tests -------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "8.3"
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+addopts = ["--strict-markers", "--strict-config", "--disable-socket", "--allow-unix-socket", "-ra"]
+xfail_strict = true
+markers = [
+    "spec(*ids): behavior IDs from docs/spec covered by this test",
+    "slow: takes more than one second",
+    "live: calls real external providers (opt-in)",
+]
+
+# --- Lint & format -----------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+extend-exclude = ["*.md"]  # spec code blocks are hand-formatted documentation
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF", "PT", "N", "C4", "PIE", "PL", "TRY", "PERF"]
+ignore = ["PLR2004"]  # magic values in comparisons: worked examples in tests are intentional
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR0913"]
+
+# --- Types -------------------------------------------------------------------
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+exclude = ["scripts/probe_sqlite.py"]  # ARC-014 spike, runs outside the project env (see ADR 0012)
+extraPaths = ["scripts"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+
+# --- Architecture (ARC-001 to ARC-005) ---------------------------------------
+
+[tool.importlinter]
+root_package = "soundline"
+
+[[tool.importlinter.contracts]]
+name = "ARC-001: the domain depends on no other layer"
+type = "forbidden"
+source_modules = ["soundline.domain"]
+forbidden_modules = ["soundline.application", "soundline.adapters", "soundline.interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "ARC-002: the application depends only on the domain"
+type = "forbidden"
+source_modules = ["soundline.application"]
+forbidden_modules = ["soundline.adapters", "soundline.interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "ARC-003: adapters do not depend on the application's use cases or on interfaces"
+type = "forbidden"
+source_modules = ["soundline.adapters"]
+forbidden_modules = ["soundline.interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "ARC-004: interfaces go through the application, never through driven adapters"
+type = "forbidden"
+source_modules = ["soundline.interfaces"]
+forbidden_modules = ["soundline.adapters"]

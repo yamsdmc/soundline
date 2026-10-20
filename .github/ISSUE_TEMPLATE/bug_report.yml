@@ -1,0 +1,27 @@
+name: Bug report
+description: Something does not behave as the specification says
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: If you know which spec behavior is violated (e.g. GEN-033), mention it.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Commands or code, plus a tiny document if relevant. Remove any confidential content.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Environment
+      description: Output of `soundline version` (or Soundline, Python and OS versions).
+      render: text
+    validations:
+      required: true

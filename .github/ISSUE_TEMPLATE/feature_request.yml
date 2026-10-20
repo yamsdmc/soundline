@@ -1,0 +1,28 @@
+name: Feature or behavior proposal
+description: Propose a new behavior or a change to the specification
+labels: [proposal]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can't you do today, or what goes wrong? Real use cases help most.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Write it as a testable statement, in the style of the spec ("Given …, Soundline MUST …").
+    validations:
+      required: true
+  - type: textarea
+    id: measure
+    attributes:
+      label: How would we know it helps?
+      description: For quality-related proposals, which metric should move (see docs/spec/06-evaluation.md)?
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Suggested scope
+      options: ["0.1", "1.0", "later", "not sure"]
