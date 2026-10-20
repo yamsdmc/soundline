@@ -15,6 +15,8 @@ class Chunk:
     span: Span
     metadata: Metadata = field(default_factory=dict[str, str], hash=False)
     """Inherited from the document; used by filters (RET-040)."""
+    section_path: tuple[str, ...] = ()
+    """Headings containing the chunk, outermost first (ING-047)."""
 
     @cached_property
     def id(self) -> str:

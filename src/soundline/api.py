@@ -7,10 +7,11 @@ from soundline.application.ask import ask
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ports import Embedder, LanguageModel, LexicalIndex, VectorIndex
 from soundline.domain.answers import Answer
+from soundline.domain.chunking import TokenCounter, approximate_token_count, chunk_document
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import Filter, Metadata, parse_filter
 from soundline.domain.hits import Hit
-from soundline.domain.quotes import Span
+from soundline.domain.markdown import parse_markdown
 from soundline.testing import HashingEmbedder, InMemoryIndex, InMemoryVectorIndex
 
 
@@ -21,7 +22,13 @@ class Soundline:
         dense: VectorIndex,
         embedder: Embedder,
         llm: LanguageModel,
+        *,
+        max_tokens: int = 384,
+        count_tokens: TokenCounter = approximate_token_count,
     ) -> None:
+        self._max_tokens = max_tokens
+        self._count_tokens = count_tokens
+        self._documents: dict[str, str] = {}
         self._lexical = lexical
         self._dense = dense
         self._embedder = embedder
@@ -29,15 +36,36 @@ class Soundline:
         self._llm = llm
 
     @classmethod
-    def in_memory(cls, llm: LanguageModel, embedder: Embedder | None = None) -> Self:
+    def in_memory(
+        cls, llm: LanguageModel, embedder: Embedder | None = None, max_tokens: int = 384
+    ) -> Self:
         """A non-persistent, offline instance, for tests and notebooks."""
         embedder = embedder or HashingEmbedder()
-        return cls(InMemoryIndex(), InMemoryVectorIndex(embedder.dimension), embedder, llm)
+        dense = InMemoryVectorIndex(embedder.dimension)
+        return cls(InMemoryIndex(), dense, embedder, llm, max_tokens=max_tokens)
 
     def ingest_text(self, source: str, text: str, metadata: Metadata | None = None) -> None:
-        chunk = Chunk(source=source, text=text, span=Span(0, len(text)), metadata=metadata or {})
-        self._lexical.add(chunk)
-        self._dense.add(chunk, self._embedder.embed_documents([chunk.text])[0])
+        """Parses Markdown (plain text is valid Markdown), chunks it and indexes the chunks."""
+        document = parse_markdown(text)
+        self._documents[source] = document.text
+        chunks = [
+            Chunk(
+                source=source,
+                text=document.text[planned.span.start : planned.span.end],
+                span=planned.span,
+                metadata=metadata or {},
+                section_path=planned.section_path,
+            )
+            for planned in chunk_document(document, self._max_tokens, self._count_tokens)
+        ]
+        vectors = self._embedder.embed_documents([chunk.text for chunk in chunks])
+        for chunk, vector in zip(chunks, vectors, strict=True):
+            self._lexical.add(chunk)
+            self._dense.add(chunk, vector)
+
+    def document_text(self, source: str) -> str:
+        """The normalized text that chunk and citation spans refer to."""
+        return self._documents[source]
 
     def search(
         self, query: str, k: int = 8, filters: Filter | Mapping[str, object] | None = None

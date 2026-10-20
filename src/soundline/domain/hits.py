@@ -19,3 +19,7 @@ class Hit:
     @property
     def text(self) -> str:
         return self.chunk.text
+
+    @property
+    def section_path(self) -> tuple[str, ...]:
+        return self.chunk.section_path

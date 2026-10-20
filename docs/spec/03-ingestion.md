@@ -65,7 +65,7 @@ The default chunker is **structure-aware**. Its observable properties are ING-04
 >
 > 1. Split along the element tree: sections (by heading), then elements.
 > 2. Merge adjacent small elements of the same section until the target size is reached.
-> 3. Split elements larger than the maximum size at the most semantic boundary available: paragraph, sentence, then word. Never split inside a word.
+> 3. Split elements larger than the maximum size at the most semantic boundary available: paragraph, sentence, then word. Never split inside a word, unless a single word exceeds `max_tokens` (a long URL or hash): it is then cut into the longest prefixes that fit, so that ING-041 always holds.
 > 4. Apply the overlap between consecutive chunks of the same section.
 
 - **ING-040** Every chunk MUST be a contiguous span `[start, end)` of the document's normalized text. Chunk text MUST equal `normalized_text[start:end]`.
