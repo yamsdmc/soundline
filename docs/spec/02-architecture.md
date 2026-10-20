@@ -181,6 +181,8 @@ Query ─► [rewrite (LanguageModel)] ─► search query
 
 ## Package layout (non-normative hypothesis)
 
+> Learned in M1: the Python facade lives outside `interfaces/` because, in a library, the facade *is* the composition root (`Soundline.in_memory(...)`, `Soundline.open(...)` wire adapters). Inside `interfaces/` it would have to import adapters, which ARC-004 forbids. CLI, HTTP and MCP call the facade.
+>
 > This layout only shows where things are expected to land. Only the layer boundaries (ARC-001 to ARC-006) are normative. Modules inside `domain/` and `application/` emerge from refactoring.
 
 ```
@@ -190,12 +192,12 @@ src/soundline/
   adapters/
     parsers/  embedders/  llms/  rerankers/  stores/  …
   interfaces/
-    api.py        # Soundline facade (public Python API)
     cli/          # Typer app
     http/         # FastAPI app
     mcp/          # MCP server
+  api.py           # Soundline facade (public Python API) = composition root (ARC-006)
   testing/         # public fakes + contract test suites
-  config/          # settings models, composition root
+  config/          # settings models
 tests/
   acceptance/      # spec scenarios through public interfaces, fakes only
   unit/            # domain and application

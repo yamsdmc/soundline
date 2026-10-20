@@ -67,7 +67,10 @@ extend-exclude = ["*.md"]  # spec code blocks are hand-formatted documentation
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF", "PT", "N", "C4", "PIE", "PL", "TRY", "PERF"]
-ignore = ["PLR2004"]  # magic values in comparisons: worked examples in tests are intentional
+ignore = [
+    "PLR2004",  # magic values in comparisons: worked examples in tests are intentional
+    "TRY003",  # ARC-031 requires errors to carry an actionable message
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR0913"]
@@ -91,13 +94,13 @@ root_package = "soundline"
 name = "ARC-001: the domain depends on no other layer"
 type = "forbidden"
 source_modules = ["soundline.domain"]
-forbidden_modules = ["soundline.application", "soundline.adapters", "soundline.interfaces"]
+forbidden_modules = ["soundline.application", "soundline.adapters", "soundline.interfaces", "soundline.testing", "soundline.api"]
 
 [[tool.importlinter.contracts]]
 name = "ARC-002: the application depends only on the domain"
 type = "forbidden"
 source_modules = ["soundline.application"]
-forbidden_modules = ["soundline.adapters", "soundline.interfaces"]
+forbidden_modules = ["soundline.adapters", "soundline.interfaces", "soundline.testing", "soundline.api"]
 
 [[tool.importlinter.contracts]]
 name = "ARC-003: adapters do not depend on the application's use cases or on interfaces"
