@@ -76,6 +76,7 @@ class Ingestor:
                 self._chunking.max_tokens,
                 self._chunking.count_tokens,
                 self._chunking.section_split_level,
+                also_fits=self._fits_embedder,  # ING-041, ING-072
             )
         ]
         vectors = self._embedder.embed_documents([chunk.text for chunk in chunks])
@@ -89,6 +90,9 @@ class Ingestor:
             self._documents.save(StoredDocument(source, revision, document.text))
             self._index.manifest.save(self._manifest)  # STO-001
         return IngestionStatus.UPDATED if previous else IngestionStatus.ADDED
+
+    def _fits_embedder(self, text: str) -> bool:
+        return self._embedder.count_tokens(text) <= self._embedder.max_input_tokens
 
     def delete(self, source: str) -> None:
         with self._index.transaction():

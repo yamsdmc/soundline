@@ -152,6 +152,16 @@ class EmbedderContract:
         assert isinstance(embedder.model_id, str)
         assert embedder.model_id
 
+    @pytest.mark.spec("ING-041")
+    def test_tokens_are_counted_with_the_model_s_own_tokenizer_within_its_limit(
+        self, embedder: Embedder
+    ) -> None:
+        short = embedder.count_tokens("Rent is due.")
+        longer = embedder.count_tokens("Rent is due on the 5th of each month, every month.")
+
+        assert embedder.max_input_tokens >= 1
+        assert 1 <= short < longer
+
     def test_embedding_is_deterministic(self, embedder: Embedder) -> None:
         assert embedder.embed_query("When is rent due?") == embedder.embed_query(
             "When is rent due?"

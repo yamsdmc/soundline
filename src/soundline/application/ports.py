@@ -57,6 +57,15 @@ class Embedder(Protocol):
     @property
     def dimension(self) -> int: ...
 
+    @property
+    def max_input_tokens(self) -> int:
+        """Longest input the model reads without truncating, in its own tokens (ING-041)."""
+        ...
+
+    def count_tokens(self, text: str) -> int:
+        """In the model's own tokenizer, which can count far more than a generic one."""
+        ...
+
     def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
         """Unit-length vectors, one per text, in order."""
         ...

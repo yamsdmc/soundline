@@ -18,7 +18,11 @@ def pipeline_manifest(embedder: Embedder, chunking: ChunkingSettings) -> Manifes
                 "section_split_level": chunking.section_split_level,
                 "tokenizer": getattr(chunking.count_tokens, "__name__", "custom"),
             },
-            "embedder": {"model_id": embedder.model_id, "dimension": embedder.dimension},
+            "embedder": {
+                "model_id": embedder.model_id,
+                "dimension": embedder.dimension,
+                "max_input_tokens": embedder.max_input_tokens,  # changes chunking (ING-041)
+            },
         }
     )
 

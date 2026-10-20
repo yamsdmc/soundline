@@ -31,6 +31,16 @@ class FastembedEmbedder:
     def dimension(self) -> int:
         return self._model.embedding_size
 
+    @property
+    def max_input_tokens(self) -> int:
+        tokenizer = getattr(self._model.model, "tokenizer", None)
+        truncation: dict[str, object] = getattr(tokenizer, "truncation", None) or {}
+        max_length = truncation.get("max_length")
+        return max_length if isinstance(max_length, int) else 512
+
+    def count_tokens(self, text: str) -> int:
+        return self._model.token_count(text)
+
     def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
         return [_unit(vector) for vector in self._model.passage_embed(list(texts))]
 

@@ -32,6 +32,13 @@ class HashingEmbedder:
     def dimension(self) -> int:
         return self._dimension
 
+    @property
+    def max_input_tokens(self) -> int:
+        return 8192
+
+    def count_tokens(self, text: str) -> int:
+        return len(_TERM.findall(text))
+
     def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
         return [self._embed(text) for text in texts]
 

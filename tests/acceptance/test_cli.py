@@ -93,7 +93,11 @@ def test_inspect_manifest_shows_how_the_index_was_built(run: Run, docs: Path):
     result = run("inspect", "manifest", "--json")
 
     manifest = json.loads(result.stdout)
-    assert manifest["embedder"] == {"model_id": "hashing:256", "dimension": 256}
+    assert manifest["embedder"] == {
+        "model_id": "hashing:256",
+        "dimension": 256,
+        "max_input_tokens": 8192,
+    }
 
 
 @pytest.mark.spec("ING-011")

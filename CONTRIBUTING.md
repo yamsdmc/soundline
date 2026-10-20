@@ -37,6 +37,8 @@ uv run pyright
 uv run ruff check && uv run ruff format --check
 uv run lint-imports           # architecture rules
 uv run python scripts/spec_coverage.py
+
+./scripts/check.sh            # all of the above, stopping at the first failure
 ```
 
 ## Commits and pull requests

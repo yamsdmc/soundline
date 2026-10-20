@@ -44,7 +44,13 @@ def chunk_document(
     max_tokens: int,
     count_tokens: TokenCounter,
     section_split_level: int = 2,
+    also_fits: Callable[[str], bool] = lambda _: True,
 ) -> list[PlannedChunk]:
+    """`also_fits` adds a constraint, e.g. the embedder's own input limit (ING-041)."""
+
+    def fits(piece: str) -> bool:
+        return count_tokens(piece) <= max_tokens and also_fits(piece)
+
     text = document.text
     chunks: list[PlannedChunk] = []
     headings: list[tuple[int, str]] = []
@@ -63,8 +69,8 @@ def chunk_document(
             headings = [h for h in headings if h[0] < element.level]
             headings.append((element.level, text[element.span.start : element.span.end]))
         path = tuple(title for _, title in headings)
-        for piece in _pieces(text, element, max_tokens, count_tokens):
-            if current and count_tokens(text[current.span.start : piece.end]) <= max_tokens:
+        for piece in _pieces(text, element, fits):
+            if current and fits(text[current.span.start : piece.end]):
                 current = PlannedChunk(Span(current.span.start, piece.end), current.section_path)
             else:
                 flush()
@@ -73,32 +79,32 @@ def chunk_document(
     return chunks
 
 
-def _pieces(text: str, element: Element, max_tokens: int, count: TokenCounter) -> list[Span]:
+def _pieces(text: str, element: Element, fits: Callable[[str], bool]) -> list[Span]:
     span = element.span
-    if count(text[span.start : span.end]) <= max_tokens:
+    if fits(text[span.start : span.end]):
         return [span]
     if element.kind in ("table", "code"):
         units = _split(text, span, re.compile(r"\n"))
     else:
         units = _split(text, span, _SENTENCE_END)
-    return [piece for unit in units for piece in _fit(text, unit, max_tokens, count)]
+    return [piece for unit in units for piece in _fit(text, unit, fits)]
 
 
-def _fit(text: str, span: Span, max_tokens: int, count: TokenCounter) -> list[Span]:
-    """Packs the words of `span` greedily into pieces of at most `max_tokens`."""
-    if count(text[span.start : span.end]) <= max_tokens:
+def _fit(text: str, span: Span, fits: Callable[[str], bool]) -> list[Span]:
+    """Packs the words of `span` greedily into pieces that fit."""
+    if fits(text[span.start : span.end]):
         return [span]
     pieces: list[Span] = []
     for word in _split(text, span, _WORD_GAP):
         last = pieces[-1] if pieces else None
-        if last and count(text[last.start : word.end]) <= max_tokens:
+        if last and fits(text[last.start : word.end]):
             pieces[-1] = Span(last.start, word.end)
         else:
-            pieces.extend(_cut(text, word, max_tokens, count))
+            pieces.extend(_cut(text, word, fits))
     return pieces
 
 
-def _cut(text: str, word: Span, max_tokens: int, count: TokenCounter) -> list[Span]:
+def _cut(text: str, word: Span, fits: Callable[[str], bool]) -> list[Span]:
     """Last resort for a single word longer than the limit (e.g. a URL): the longest prefixes
     that fit, found by binary search; at least one character per piece."""
     pieces: list[Span] = []
@@ -107,7 +113,7 @@ def _cut(text: str, word: Span, max_tokens: int, count: TokenCounter) -> list[Sp
         low, high = start + 1, word.end
         while low < high:
             middle = (low + high + 1) // 2
-            if count(text[start:middle]) <= max_tokens:
+            if fits(text[start:middle]):
                 low = middle
             else:
                 high = middle - 1
