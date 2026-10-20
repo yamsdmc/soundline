@@ -1,6 +1,6 @@
 # 0012 — SQLite binding: standard library first, `sqlean.py` fallback
 
-- Status: Proposed. It becomes Accepted when the `sqlite-probe` CI job is green on Linux, macOS and Windows.
+- Status: Accepted (the `sqlite-probe` CI job passed on Linux, macOS and Windows, run 39472493401, commit 19e4827)
 - Date: 2026-10-20
 
 ## Context

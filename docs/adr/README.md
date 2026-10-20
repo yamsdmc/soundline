@@ -15,7 +15,7 @@ We record significant decisions as [ADRs](https://adr.github.io/) (Michael Nygar
 | [0009](0009-pipeline-fingerprint.md) | Pipeline fingerprint and refusal of mixed indexes | Accepted |
 | [0010](0010-fakes-verified-by-contract-tests.md) | Fakes over mocks, verified by public contract tests | Accepted |
 | [0011](0011-apache-2-license.md) | Apache License 2.0 | Accepted |
-| [0012](0012-sqlite-binding-with-extension-fallback.md) | SQLite binding: standard library first, `sqlean.py` fallback | Proposed |
+| [0012](0012-sqlite-binding-with-extension-fallback.md) | SQLite binding: standard library first, `sqlean.py` fallback | Accepted |
 
 ## Template
 
