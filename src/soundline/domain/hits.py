@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from soundline.domain.chunks import Chunk
 
@@ -34,3 +34,11 @@ class Hit:
             "span": [self.chunk.span.start, self.chunk.span.end],
             "metadata": dict(self.chunk.metadata),
         }
+
+
+@dataclass(frozen=True)
+class SearchResult:
+    hits: list[Hit]
+    degraded: bool = False
+    """True when a retriever failed and the others answered alone (RET-034)."""
+    warnings: list[str] = field(default_factory=list[str])

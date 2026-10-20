@@ -92,11 +92,14 @@ def search(
     except json.JSONDecodeError as error:
         _fail(InvalidFilterError(f"--filter is not valid JSON: {error}"), USAGE_ERROR)
     with _soundline() as soundline:
-        hits = soundline.search(query, k=k, filters=filters)
+        result = soundline.search_result(query, k=k, filters=filters)
+    for warning in result.warnings:
+        typer.echo(f"warning: {warning} (degraded result)", err=True)
     if as_json:
-        typer.echo(json.dumps({"hits": [hit.to_dict() for hit in hits]}))
+        hits_json = [hit.to_dict() for hit in result.hits]
+        typer.echo(json.dumps({"hits": hits_json, "degraded": result.degraded}))
         return
-    for rank, hit in enumerate(hits, 1):
+    for rank, hit in enumerate(result.hits, 1):
         where = " > ".join(hit.section_path) or "-"
         ranks = ", ".join(f"{name} {r or '-'}" for name, r in hit.ranks.items())
         typer.echo(f"{rank}. {hit.source}  [{where}]  score {hit.score:.4f} ({ranks})")

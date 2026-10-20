@@ -15,7 +15,7 @@ from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.errors import ConfigurationError
 from soundline.domain.filters import Filter, Metadata, parse_filter
-from soundline.domain.hits import Hit
+from soundline.domain.hits import Hit, SearchResult
 from soundline.domain.manifest import Manifest
 from soundline.testing import (
     HashingEmbedder,
@@ -135,9 +135,15 @@ class Soundline:
         self, query: str, k: int = 8, filters: Filter | Mapping[str, object] | None = None
     ) -> list[Hit]:
         """`filters` is a builder filter (`F.eq(...)`) or its canonical JSON form (API-002)."""
+        return self.search_result(query, k, filters).hits
+
+    def search_result(
+        self, query: str, k: int = 8, filters: Filter | Mapping[str, object] | None = None
+    ) -> SearchResult:
+        """Like search, and says whether a retriever failed and the result is degraded."""
         condition = parse_filter(filters) if isinstance(filters, Mapping) else filters
         check_pipeline(self._index.manifest, self._manifest)  # STO-012
-        return self._retriever.hits(query, k, condition)
+        return self._retriever.search_result(query, k, condition)
 
     def ask(self, question: str) -> Answer:
         if self._llm is None:

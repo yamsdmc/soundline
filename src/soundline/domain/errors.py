@@ -17,3 +17,9 @@ class ConfigurationError(SoundlineError):
     """The configuration cannot work as given; the message says how to fix it."""
 
     code = "configuration_error"
+
+
+class ProviderUnavailableError(SoundlineError):
+    """A provider (model, store) cannot be reached right now; retrying later may work (ARC-032)."""
+
+    code = "provider_unavailable"
