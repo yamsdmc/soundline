@@ -1,5 +1,6 @@
 from soundline.application.ports import Embedder, LexicalIndex, VectorIndex
 from soundline.domain.chunks import Chunk
+from soundline.domain.filters import Filter
 from soundline.domain.fusion import fuse
 from soundline.domain.hits import Hit
 
@@ -19,10 +20,12 @@ class HybridRetriever:
         self._embedder = embedder
         self._first_stage_k = first_stage_k
 
-    def hits(self, text: str, limit: int) -> list[Hit]:
+    def hits(self, text: str, limit: int, filter: Filter | None = None) -> list[Hit]:
+        """Both retrievers apply the same filter before ranking (RET-041)."""
+        query = self._embedder.embed_query(text)
         rankings = {
-            "lexical": self._lexical.search(text, self._first_stage_k),
-            "dense": self._dense.search(self._embedder.embed_query(text), self._first_stage_k),
+            "lexical": self._lexical.search(text, self._first_stage_k, filter),
+            "dense": self._dense.search(query, self._first_stage_k, filter),
         }
         chunks = {chunk.id: chunk for ranking in rankings.values() for chunk in ranking}
         fused = fuse({name: [chunk.id for chunk in ranking] for name, ranking in rankings.items()})

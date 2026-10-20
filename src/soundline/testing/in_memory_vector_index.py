@@ -1,5 +1,6 @@
 from soundline.application.ports import Vector
 from soundline.domain.chunks import Chunk
+from soundline.domain.filters import Filter, matches
 
 
 class InMemoryVectorIndex:
@@ -16,8 +17,9 @@ class InMemoryVectorIndex:
             )
         self._entries.append((chunk, vector))
 
-    def search(self, vector: Vector, limit: int) -> list[Chunk]:
+    def search(self, vector: Vector, limit: int, filter: Filter | None = None) -> list[Chunk]:
         def similarity(entry: tuple[Chunk, Vector]) -> float:
             return sum(x * y for x, y in zip(vector, entry[1], strict=True))
 
-        return [chunk for chunk, _ in sorted(self._entries, key=similarity, reverse=True)[:limit]]
+        candidates = [e for e in self._entries if filter is None or matches(filter, e[0].metadata)]
+        return [chunk for chunk, _ in sorted(candidates, key=similarity, reverse=True)[:limit]]

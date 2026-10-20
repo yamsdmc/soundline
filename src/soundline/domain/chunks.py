@@ -1,7 +1,8 @@
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 
+from soundline.domain.filters import Metadata
 from soundline.domain.quotes import Span
 
 
@@ -12,6 +13,8 @@ class Chunk:
     source: str
     text: str
     span: Span
+    metadata: Metadata = field(default_factory=dict[str, str], hash=False)
+    """Inherited from the document; used by filters (RET-040)."""
 
     @cached_property
     def id(self) -> str:

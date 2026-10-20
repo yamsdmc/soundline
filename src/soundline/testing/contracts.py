@@ -17,11 +17,12 @@ import pytest
 
 from soundline.application.ports import Embedder, LexicalIndex, Vector, VectorIndex
 from soundline.domain.chunks import Chunk
+from soundline.domain.filters import F
 from soundline.domain.quotes import Span
 
 
-def _chunk(source: str, text: str) -> Chunk:
-    return Chunk(source=source, text=text, span=Span(0, len(text)))
+def _chunk(source: str, text: str, **metadata: str | int | list[str]) -> Chunk:
+    return Chunk(source=source, text=text, span=Span(0, len(text)), metadata=metadata)
 
 
 class LexicalIndexContract:
@@ -71,6 +72,33 @@ class LexicalIndexContract:
         index.add(_chunk("lease.md", "Rent is due on the 5th."))
 
         index.search(hostile, limit=5)
+
+    @pytest.mark.spec("RET-041")
+    def test_a_filtered_search_only_returns_matching_chunks_with_their_metadata(
+        self, index: LexicalIndex
+    ) -> None:
+        lease = _chunk("lease.md", "Rent is due on the 5th.", type="contract", year=2024)
+        index.add(lease)
+        index.add(_chunk("memo.md", "Rent memo for the team.", type="memo", year=2024))
+
+        assert index.search("rent", limit=5, filter=F.eq("type", "contract")) == [lease]
+
+    @pytest.mark.spec("RET-041")
+    def test_a_filtered_search_fills_the_limit_even_when_matches_rank_low_globally(
+        self, index: LexicalIndex
+    ) -> None:
+        for n in range(10):
+            index.add(_chunk(f"memo-{n}.md", "Rent rent rent: rent reminders.", type="memo"))
+        contracts = [
+            _chunk(f"lease-{n}.md", f"Clause {n} mentions rent once.", type="contract")
+            for n in range(2)
+        ]
+        for contract in contracts:
+            index.add(contract)
+
+        found = index.search("rent", limit=2, filter=F.eq("type", "contract"))
+
+        assert sorted(found, key=lambda c: c.source) == contracts
 
 
 def _cosine(a: Vector, b: Vector) -> float:
@@ -156,3 +184,14 @@ class VectorIndexContract:
     def test_a_vector_of_the_wrong_dimension_is_rejected(self, index: VectorIndex) -> None:
         with pytest.raises(ValueError, match="dimension"):
             index.add(_chunk("flat.md", "Flat."), _unit(1, 0))
+
+    @pytest.mark.spec("RET-041")
+    def test_a_filtered_search_returns_the_nearest_matching_chunks_even_if_far(
+        self, index: VectorIndex
+    ) -> None:
+        for n in range(10):
+            index.add(_chunk(f"memo-{n}.md", f"Memo {n}.", type="memo"), _unit(1, 0.01 * n, 0))
+        far = _chunk("lease.md", "Lease.", type="contract", tags=["rent"])
+        index.add(far, _unit(0, 0, 1))
+
+        assert index.search(_unit(1, 0, 0), limit=1, filter=F.eq("tags", "rent")) == [far]

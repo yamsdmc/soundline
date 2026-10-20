@@ -1,6 +1,6 @@
 import pytest
 
-from soundline import Soundline
+from soundline import F, Filter, InvalidFilterError, Soundline
 from soundline.testing import HashingEmbedder, ScriptedLanguageModel
 
 LEASE = "Rent is payable on the 5th of each month."
@@ -55,3 +55,30 @@ def test_k_limits_the_number_of_hits():
     soundline = soundline_with(*((f"{n}.md", f"Rent note {n}.") for n in range(5)))
 
     assert len(soundline.search("rent", k=3)) == 3
+
+
+@pytest.mark.spec("RET-040", "RET-041", "RET-044", "API-002")
+@pytest.mark.parametrize(
+    "contracts_only",
+    [F.eq("type", "contract"), {"eq": ["type", "contract"]}],
+    ids=["builder", "canonical-json"],
+)
+def test_search_can_be_restricted_by_metadata_with_the_builder_or_json(
+    contracts_only: Filter | dict[str, object],
+):
+    embedder = HashingEmbedder()
+    soundline = Soundline.in_memory(llm=ScriptedLanguageModel(), embedder=embedder)
+    soundline.ingest_text("memo.md", "Rent rent rent: reminders.", metadata={"type": "memo"})
+    soundline.ingest_text("lease.md", "Rent is due on the 5th.", metadata={"type": "contract"})
+
+    hits = soundline.search("rent", filters=contracts_only)
+
+    assert [hit.source for hit in hits] == ["lease.md"]
+
+
+@pytest.mark.spec("RET-043")
+def test_a_malformed_filter_is_rejected_before_searching():
+    soundline = soundline_with(("lease.md", LEASE))
+
+    with pytest.raises(InvalidFilterError):
+        soundline.search("rent", filters={"like": ["type", "con%"]})

@@ -1,6 +1,7 @@
 import re
 
 from soundline.domain.chunks import Chunk
+from soundline.domain.filters import Filter, matches
 
 _TERM = re.compile(r"\w+")
 
@@ -18,8 +19,9 @@ class InMemoryIndex:
     def add(self, chunk: Chunk) -> None:
         self._chunks.append(chunk)
 
-    def search(self, text: str, limit: int) -> list[Chunk]:
+    def search(self, text: str, limit: int, filter: Filter | None = None) -> list[Chunk]:
         query = _terms(text)
-        scored = [(len(query & _terms(chunk.text)), chunk) for chunk in self._chunks]
+        candidates = [c for c in self._chunks if filter is None or matches(filter, c.metadata)]
+        scored = [(len(query & _terms(chunk.text)), chunk) for chunk in candidates]
         ranked = sorted((pair for pair in scored if pair[0] > 0), key=lambda pair: -pair[0])
         return [chunk for _, chunk in ranked[:limit]]

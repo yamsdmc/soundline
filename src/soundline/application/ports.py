@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from soundline.domain.chunks import Chunk
+from soundline.domain.filters import Filter
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,9 @@ class Retriever(Protocol):
 class LexicalIndex(Protocol):
     def add(self, chunk: Chunk) -> None: ...
 
-    def search(self, text: str, limit: int) -> list[Chunk]: ...
+    def search(self, text: str, limit: int, filter: Filter | None = None) -> list[Chunk]:
+        """As if only the chunks matching `filter` were indexed (RET-041)."""
+        ...
 
 
 class VectorIndex(Protocol):
@@ -50,6 +53,6 @@ class VectorIndex(Protocol):
         """Raises ValueError when the vector's dimension differs from the index's (STO-011)."""
         ...
 
-    def search(self, vector: Vector, limit: int) -> list[Chunk]:
-        """Nearest chunks first, by cosine similarity (RET-021)."""
+    def search(self, vector: Vector, limit: int, filter: Filter | None = None) -> list[Chunk]:
+        """Nearest chunks first, by cosine similarity (RET-021); filters as for LexicalIndex."""
         ...
