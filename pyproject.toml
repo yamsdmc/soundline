@@ -18,7 +18,10 @@ classifiers = [
     "Topic :: Text Processing :: Indexing",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "sqlean-py>=3.47",
+    "sqlite-vec>=0.1.6",
+]
 
 [project.urls]
 Homepage = "https://github.com/yamsdmc/soundline"

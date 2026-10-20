@@ -11,9 +11,11 @@ Third-party adapters can be verified the same way (API-020)::
 Requires pytest.
 """
 
+import math
+
 import pytest
 
-from soundline.application.ports import LexicalIndex
+from soundline.application.ports import Embedder, LexicalIndex, Vector
 from soundline.domain.chunks import Chunk
 from soundline.domain.quotes import Span
 
@@ -69,3 +71,48 @@ class LexicalIndexContract:
         index.add(_chunk("lease.md", "Rent is due on the 5th."))
 
         index.search(hostile, limit=5)
+
+
+def _cosine(a: Vector, b: Vector) -> float:
+    return sum(x * y for x, y in zip(a, b, strict=True))
+
+
+class EmbedderContract:
+    @pytest.fixture
+    def embedder(self) -> Embedder:
+        raise NotImplementedError
+
+    def test_vectors_have_the_declared_dimension_and_unit_length(self, embedder: Embedder) -> None:
+        vectors = [
+            *embedder.embed_documents(["Rent is due on the 5th."]),
+            embedder.embed_query("rent"),
+        ]
+
+        for vector in vectors:
+            assert len(vector) == embedder.dimension
+            assert math.isclose(math.sqrt(sum(x * x for x in vector)), 1.0, rel_tol=1e-3)
+
+    def test_embedding_is_deterministic(self, embedder: Embedder) -> None:
+        assert embedder.embed_query("When is rent due?") == embedder.embed_query(
+            "When is rent due?"
+        )
+
+    def test_a_batch_embeds_each_text_as_it_would_alone(self, embedder: Embedder) -> None:
+        texts = ["Rent is due on the 5th.", "Pets are allowed in the garden."]
+
+        batch = embedder.embed_documents(texts)
+        alone = [embedder.embed_documents([text])[0] for text in texts]
+
+        for together, single in zip(batch, alone, strict=True):
+            assert _cosine(together, single) == pytest.approx(1.0, abs=1e-4)
+
+    @pytest.mark.spec("RET-022")
+    def test_a_query_is_closer_to_a_related_passage_than_to_an_unrelated_one(
+        self, embedder: Embedder
+    ) -> None:
+        related, unrelated = embedder.embed_documents(
+            ["The rent is due on the 5th of each month.", "Pets are allowed in the garden."]
+        )
+        query = embedder.embed_query("When is the rent due?")
+
+        assert _cosine(query, related) > _cosine(query, unrelated)

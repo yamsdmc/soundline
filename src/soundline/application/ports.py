@@ -1,6 +1,6 @@
 """Ports: what the application needs from the outside world (see docs/spec/02-architecture.md)."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -17,6 +17,20 @@ class LanguageModel(Protocol):
     def generate(self, request: GenerationRequest) -> Mapping[str, object]:
         """Returns the model's structured output."""
         ...
+
+
+type Vector = tuple[float, ...]
+
+
+class Embedder(Protocol):
+    @property
+    def dimension(self) -> int: ...
+
+    def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
+        """Unit-length vectors, one per text, in order."""
+        ...
+
+    def embed_query(self, text: str) -> Vector: ...
 
 
 class LexicalIndex(Protocol):

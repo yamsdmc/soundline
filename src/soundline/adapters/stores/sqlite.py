@@ -1,10 +1,34 @@
 import re
 import sqlite3
+from collections.abc import Sequence
+from types import ModuleType
+from typing import Any
+
+import sqlean  # pyright: ignore[reportMissingTypeStubs]
+import sqlite_vec
 
 from soundline.domain.chunks import Chunk
 from soundline.domain.quotes import Span
 
 _TERM = re.compile(r"\w+")
+
+
+def open_database(
+    path: str, bindings: Sequence[ModuleType | Any] = (sqlite3, sqlean)
+) -> sqlite3.Connection:
+    """Opens a SQLite database with sqlite-vec loaded (ARC-014, ADR 0012).
+
+    Some Python builds compile `sqlite3` without extension loading; the next binding
+    (`sqlean.py`, same DB-API) is then used.
+    """
+    for binding in bindings:
+        connection = binding.connect(path)
+        if hasattr(connection, "enable_load_extension"):
+            connection.enable_load_extension(True)
+            sqlite_vec.load(connection)
+            connection.enable_load_extension(False)
+            return connection
+    raise RuntimeError("no SQLite binding on this Python can load extensions")
 
 
 class SqliteLexicalIndex:
