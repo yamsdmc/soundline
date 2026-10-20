@@ -1,4 +1,5 @@
 import hashlib
+from dataclasses import dataclass
 from enum import Enum
 
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
@@ -13,6 +14,25 @@ class IngestionStatus(Enum):
     ADDED = "added"
     UPDATED = "updated"
     UNCHANGED = "unchanged"
+    DELETED = "deleted"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class SourceResult:
+    source: str
+    status: IngestionStatus
+    reason: str | None = None
+    """Stable code for SKIPPED and FAILED, e.g. `unsupported_media_type`, `not_utf8`."""
+
+
+@dataclass(frozen=True)
+class IngestionReport:
+    results: list[SourceResult]
+
+    def count(self, status: IngestionStatus) -> int:
+        return sum(result.status is status for result in self.results)
 
 
 class Ingestor:
@@ -61,3 +81,9 @@ class Ingestor:
             self._documents.save(StoredDocument(source, revision, document.text))
             self._index.manifest.save(self._manifest)  # STO-001
         return IngestionStatus.UPDATED if previous else IngestionStatus.ADDED
+
+    def delete(self, source: str) -> None:
+        with self._index.transaction():
+            self._lexical.remove(source)
+            self._dense.remove(source)
+            self._documents.remove(source)

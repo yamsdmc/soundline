@@ -96,6 +96,22 @@ class VectorIndex(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class Discovery:
+    sources: list[str]
+    """URIs of every regular file found, supported or not, sorted."""
+    scopes: list[str]
+    """URIs of the inputs themselves: what a sync is allowed to delete under."""
+
+
+class SourceReader(Protocol):
+    def discover(self, inputs: Sequence[str]) -> Discovery:
+        """Files and directories (recursively); hidden entries and symlinks are skipped."""
+        ...
+
+    def read(self, uri: str) -> bytes: ...
+
+
 class ManifestStore(Protocol):
     def load(self) -> Manifest | None: ...
 
@@ -112,3 +128,5 @@ class Index:
     dense: VectorIndex
     manifest: ManifestStore
     transaction: Callable[[], AbstractContextManager[object]] = field(default=nullcontext)
+    close: Callable[[], object] = field(default=lambda: None)
+    """Releases the index's resources (e.g. its database connection)."""

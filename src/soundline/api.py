@@ -1,15 +1,16 @@
 """The public Python API, and the composition root that wires adapters to ports (ARC-006)."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from types import TracebackType
 from typing import Self
 
 from soundline.application.ask import ask
 from soundline.application.hybrid_retriever import HybridRetriever
-from soundline.application.ingest import IngestionStatus, Ingestor
+from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
+from soundline.application.ingest_sources import ingest_sources
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
-from soundline.application.ports import Embedder, Index, LanguageModel
+from soundline.application.ports import Embedder, Index, LanguageModel, SourceReader
 from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.filters import Filter, Metadata, parse_filter
@@ -30,7 +31,8 @@ class Soundline:
         embedder: Embedder,
         llm: LanguageModel,
         chunking: ChunkingSettings | None = None,
-        close: Callable[[], object] = lambda: None,
+        *,
+        reader: SourceReader | None = None,
     ) -> None:
         chunking = chunking or ChunkingSettings()
         self._index = index
@@ -39,7 +41,7 @@ class Soundline:
         self._ingestor = Ingestor(index, embedder, chunking)
         self._retriever = HybridRetriever(index.lexical, index.dense, embedder)
         self._llm = llm
-        self._close = close
+        self._reader = reader or _local_files()
 
     @classmethod
     def open(
@@ -67,8 +69,9 @@ class Soundline:
             SqliteVectorIndex(database, embedder.dimension),
             SqliteManifestStore(database),
             transaction=lambda: database,  # commits on success, rolls back on error
+            close=database.close,
         )
-        return cls(index, embedder, llm, chunking, close=database.close)
+        return cls(index, embedder, llm, chunking)
 
     def __enter__(self) -> Self:
         return self
@@ -82,7 +85,7 @@ class Soundline:
         self.close()
 
     def close(self) -> None:
-        self._close()
+        self._index.close()
 
     @classmethod
     def in_memory(
@@ -102,6 +105,22 @@ class Soundline:
         Unchanged content is a no-op (ING-007); changed content replaces the source (ING-009).
         """
         return self._ingestor.ingest_text(source, text, metadata)
+
+    def ingest(self, inputs: Sequence[str | Path]) -> IngestionReport:
+        """Files and directories, recursively. Never deletes anything (ING-011)."""
+        return ingest_sources(
+            [str(i) for i in inputs], self._reader, self._ingestor, self._documents
+        )
+
+    def sync(self, inputs: Sequence[str | Path]) -> IngestionReport:
+        """Like ingest, and deletes documents under `inputs` whose files disappeared (ING-011)."""
+        return ingest_sources(
+            [str(i) for i in inputs],
+            self._reader,
+            self._ingestor,
+            self._documents,
+            delete_missing=True,
+        )
 
     def document_text(self, source: str) -> str:
         """The normalized text that chunk and citation spans refer to."""
@@ -126,3 +145,9 @@ def _default_embedder() -> Embedder:
     from soundline.adapters.embedders.fastembed import FastembedEmbedder  # noqa: PLC0415
 
     return FastembedEmbedder("intfloat/multilingual-e5-large")  # CFG-023
+
+
+def _local_files() -> SourceReader:
+    from soundline.adapters.sources.local_files import LocalFiles  # noqa: PLC0415
+
+    return LocalFiles()
