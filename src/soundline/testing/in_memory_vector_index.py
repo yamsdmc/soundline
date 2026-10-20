@@ -17,6 +17,9 @@ class InMemoryVectorIndex:
             )
         self._entries.append((chunk, vector))
 
+    def remove(self, source: str) -> None:
+        self._entries = [entry for entry in self._entries if entry[0].source != source]
+
     def search(self, vector: Vector, limit: int, filter: Filter | None = None) -> list[Chunk]:
         def similarity(entry: tuple[Chunk, Vector]) -> float:
             return sum(x * y for x, y in zip(vector, entry[1], strict=True))

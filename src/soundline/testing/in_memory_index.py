@@ -19,6 +19,9 @@ class InMemoryIndex:
     def add(self, chunk: Chunk) -> None:
         self._chunks.append(chunk)
 
+    def remove(self, source: str) -> None:
+        self._chunks = [chunk for chunk in self._chunks if chunk.source != source]
+
     def search(self, text: str, limit: int, filter: Filter | None = None) -> list[Chunk]:
         query = _terms(text)
         candidates = [c for c in self._chunks if filter is None or matches(filter, c.metadata)]

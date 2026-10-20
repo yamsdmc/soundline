@@ -5,34 +5,31 @@ from typing import Self
 
 from soundline.application.ask import ask
 from soundline.application.hybrid_retriever import HybridRetriever
-from soundline.application.ports import Embedder, LanguageModel, LexicalIndex, VectorIndex
+from soundline.application.ingest import IngestionStatus, Ingestor
+from soundline.application.ports import Embedder, Index, LanguageModel
 from soundline.domain.answers import Answer
-from soundline.domain.chunking import TokenCounter, approximate_token_count, chunk_document
-from soundline.domain.chunks import Chunk
+from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.filters import Filter, Metadata, parse_filter
 from soundline.domain.hits import Hit
-from soundline.domain.markdown import parse_markdown
-from soundline.testing import HashingEmbedder, InMemoryIndex, InMemoryVectorIndex
+from soundline.testing import (
+    HashingEmbedder,
+    InMemoryDocumentStore,
+    InMemoryIndex,
+    InMemoryVectorIndex,
+)
 
 
 class Soundline:
     def __init__(
         self,
-        lexical: LexicalIndex,
-        dense: VectorIndex,
+        index: Index,
         embedder: Embedder,
         llm: LanguageModel,
-        *,
-        max_tokens: int = 384,
-        count_tokens: TokenCounter = approximate_token_count,
+        chunking: ChunkingSettings | None = None,
     ) -> None:
-        self._max_tokens = max_tokens
-        self._count_tokens = count_tokens
-        self._documents: dict[str, str] = {}
-        self._lexical = lexical
-        self._dense = dense
-        self._embedder = embedder
-        self._retriever = HybridRetriever(lexical, dense, embedder)
+        self._documents = index.documents
+        self._ingestor = Ingestor(index, embedder, chunking or ChunkingSettings())
+        self._retriever = HybridRetriever(index.lexical, index.dense, embedder)
         self._llm = llm
 
     @classmethod
@@ -42,30 +39,24 @@ class Soundline:
         """A non-persistent, offline instance, for tests and notebooks."""
         embedder = embedder or HashingEmbedder()
         dense = InMemoryVectorIndex(embedder.dimension)
-        return cls(InMemoryIndex(), dense, embedder, llm, max_tokens=max_tokens)
+        index = Index(InMemoryDocumentStore(), InMemoryIndex(), dense)
+        return cls(index, embedder, llm, ChunkingSettings(max_tokens=max_tokens))
 
-    def ingest_text(self, source: str, text: str, metadata: Metadata | None = None) -> None:
-        """Parses Markdown (plain text is valid Markdown), chunks it and indexes the chunks."""
-        document = parse_markdown(text)
-        self._documents[source] = document.text
-        chunks = [
-            Chunk(
-                source=source,
-                text=document.text[planned.span.start : planned.span.end],
-                span=planned.span,
-                metadata=metadata or {},
-                section_path=planned.section_path,
-            )
-            for planned in chunk_document(document, self._max_tokens, self._count_tokens)
-        ]
-        vectors = self._embedder.embed_documents([chunk.text for chunk in chunks])
-        for chunk, vector in zip(chunks, vectors, strict=True):
-            self._lexical.add(chunk)
-            self._dense.add(chunk, vector)
+    def ingest_text(
+        self, source: str, text: str, metadata: Metadata | None = None
+    ) -> IngestionStatus:
+        """Parses Markdown (plain text is valid Markdown), chunks it and indexes the chunks.
+
+        Unchanged content is a no-op (ING-007); changed content replaces the source (ING-009).
+        """
+        return self._ingestor.ingest_text(source, text, metadata)
 
     def document_text(self, source: str) -> str:
         """The normalized text that chunk and citation spans refer to."""
-        return self._documents[source]
+        document = self._documents.get(source)
+        if document is None:
+            raise KeyError(source)
+        return document.text
 
     def search(
         self, query: str, k: int = 8, filters: Filter | Mapping[str, object] | None = None

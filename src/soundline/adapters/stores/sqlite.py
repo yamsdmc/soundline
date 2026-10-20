@@ -8,6 +8,7 @@ from typing import Any
 
 import sqlite_vec
 
+from soundline.application.ports import StoredDocument
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import And, Compare, Exists, Filter, Member, Not, Or, Scalar
 from soundline.domain.quotes import Span
@@ -177,6 +178,9 @@ class SqliteLexicalIndex:
             ),
         )
 
+    def remove(self, source: str) -> None:
+        self._db.execute("delete from chunk_fts where source = ?", (source,))
+
     def search(self, text: str, limit: int, filter: Filter | None = None) -> list[Chunk]:
         # Each query term is quoted, so user text can never be read as FTS5 syntax (RET-013).
         terms = _TERM.findall(text.lower())
@@ -226,6 +230,9 @@ class SqliteVectorIndex:
             ),
         )
 
+    def remove(self, source: str) -> None:
+        self._db.execute("delete from chunk_vec where source = ?", (source,))
+
     def search(
         self, vector: tuple[float, ...], limit: int, filter: Filter | None = None
     ) -> list[Chunk]:
@@ -244,3 +251,30 @@ class SqliteVectorIndex:
                 [*params, query, limit],
             )
         return [_chunk(row) for row in rows]
+
+
+class SqliteDocumentStore:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._db = connection
+        self._db.execute(
+            "create table if not exists document("
+            " source text primary key, revision text not null, text text not null)"
+        )
+
+    def get(self, source: str) -> StoredDocument | None:
+        row = self._db.execute(
+            "select source, revision, text from document where source = ?", (source,)
+        ).fetchone()
+        return StoredDocument(*row) if row else None
+
+    def save(self, document: StoredDocument) -> None:
+        self._db.execute(
+            "insert or replace into document(source, revision, text) values (?, ?, ?)",
+            (document.source, document.revision, document.text),
+        )
+
+    def remove(self, source: str) -> None:
+        self._db.execute("delete from document where source = ?", (source,))
+
+    def sources(self) -> list[str]:
+        return [row[0] for row in self._db.execute("select source from document order by source")]

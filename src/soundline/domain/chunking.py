@@ -25,6 +25,15 @@ def approximate_token_count(text: str) -> int:
 
 
 @dataclass(frozen=True)
+class ChunkingSettings:
+    """Everything that decides how a document is cut; part of the pipeline fingerprint."""
+
+    max_tokens: int = 384
+    section_split_level: int = 2
+    count_tokens: TokenCounter = approximate_token_count
+
+
+@dataclass(frozen=True)
 class PlannedChunk:
     span: Span
     section_path: tuple[str, ...]

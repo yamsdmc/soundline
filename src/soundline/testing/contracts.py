@@ -15,7 +15,14 @@ import math
 
 import pytest
 
-from soundline.application.ports import Embedder, LexicalIndex, Vector, VectorIndex
+from soundline.application.ports import (
+    DocumentStore,
+    Embedder,
+    LexicalIndex,
+    StoredDocument,
+    Vector,
+    VectorIndex,
+)
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import F
 from soundline.domain.quotes import Span
@@ -99,6 +106,17 @@ class LexicalIndexContract:
         found = index.search("rent", limit=2, filter=F.eq("type", "contract"))
 
         assert sorted(found, key=lambda c: c.source) == contracts
+
+    @pytest.mark.spec("ING-009")
+    def test_removing_a_source_removes_only_its_chunks(self, index: LexicalIndex) -> None:
+        kept = _chunk("rules.md", "Rent goes to the agency.")
+        index.add(_chunk("lease.md", "Rent is due on the 5th."))
+        index.add(_chunk("lease.md", "Rent is late after 10 days."))
+        index.add(kept)
+
+        index.remove("lease.md")
+
+        assert index.search("rent", limit=5) == [kept]
 
 
 def _cosine(a: Vector, b: Vector) -> float:
@@ -195,3 +213,46 @@ class VectorIndexContract:
         index.add(far, _unit(0, 0, 1))
 
         assert index.search(_unit(1, 0, 0), limit=1, filter=F.eq("tags", "rent")) == [far]
+
+    @pytest.mark.spec("ING-009")
+    def test_removing_a_source_removes_only_its_chunks(self, index: VectorIndex) -> None:
+        kept = _chunk("rules.md", "Rules.")
+        index.add(_chunk("lease.md", "Lease."), _unit(1, 0, 0))
+        index.add(kept, _unit(0, 1, 0))
+
+        index.remove("lease.md")
+
+        assert index.search(_unit(1, 0, 0), limit=5) == [kept]
+
+
+class DocumentStoreContract:
+    @pytest.fixture
+    def store(self) -> DocumentStore:
+        raise NotImplementedError
+
+    def test_an_unknown_document_has_no_revision(self, store: DocumentStore) -> None:
+        assert store.get("lease.md") is None
+
+    @pytest.mark.spec("ING-008")
+    def test_a_saved_document_is_returned_by_its_source(self, store: DocumentStore) -> None:
+        lease = StoredDocument("lease.md", revision="r1", text="Rent is due.")
+        store.save(lease)
+
+        assert store.get("lease.md") == lease
+
+    @pytest.mark.spec("ING-009")
+    def test_saving_a_new_revision_replaces_the_previous_one(self, store: DocumentStore) -> None:
+        store.save(StoredDocument("lease.md", revision="r1", text="Rent is due."))
+        store.save(StoredDocument("lease.md", revision="r2", text="Rent is late."))
+
+        assert store.get("lease.md") == StoredDocument("lease.md", "r2", "Rent is late.")
+        assert store.sources() == ["lease.md"]
+
+    def test_a_removed_document_is_gone(self, store: DocumentStore) -> None:
+        store.save(StoredDocument("lease.md", revision="r1", text="Rent is due."))
+        store.save(StoredDocument("rules.md", revision="r1", text="No smoking."))
+
+        store.remove("lease.md")
+
+        assert store.get("lease.md") is None
+        assert store.sources() == ["rules.md"]

@@ -9,6 +9,29 @@ from soundline.domain.filters import Filter
 
 
 @dataclass(frozen=True)
+class StoredDocument:
+    source: str
+    revision: str
+    """Content hash of the document's raw bytes."""
+    text: str
+    """Normalized text, which chunk and citation spans refer to."""
+
+
+class DocumentStore(Protocol):
+    def get(self, source: str) -> StoredDocument | None: ...
+
+    def save(self, document: StoredDocument) -> None:
+        """Inserts or replaces the document of `document.source`."""
+        ...
+
+    def remove(self, source: str) -> None: ...
+
+    def sources(self) -> list[str]:
+        """Sorted."""
+        ...
+
+
+@dataclass(frozen=True)
 class GenerationRequest:
     system: str
     prompt: str
@@ -43,6 +66,10 @@ class Retriever(Protocol):
 class LexicalIndex(Protocol):
     def add(self, chunk: Chunk) -> None: ...
 
+    def remove(self, source: str) -> None:
+        """Removes every chunk of `source`."""
+        ...
+
     def search(self, text: str, limit: int, filter: Filter | None = None) -> list[Chunk]:
         """As if only the chunks matching `filter` were indexed (RET-041)."""
         ...
@@ -53,6 +80,19 @@ class VectorIndex(Protocol):
         """Raises ValueError when the vector's dimension differs from the index's (STO-011)."""
         ...
 
+    def remove(self, source: str) -> None:
+        """Removes every chunk of `source`."""
+        ...
+
     def search(self, vector: Vector, limit: int, filter: Filter | None = None) -> list[Chunk]:
         """Nearest chunks first, by cosine similarity (RET-021); filters as for LexicalIndex."""
         ...
+
+
+@dataclass(frozen=True)
+class Index:
+    """All persisted data of a corpus (see the glossary): documents and both search indexes."""
+
+    documents: DocumentStore
+    lexical: LexicalIndex
+    dense: VectorIndex
