@@ -24,7 +24,11 @@ dependencies = [
     # No Windows wheels exist; Windows CPython builds load extensions natively.
     "sqlean-py>=3.47; sys_platform != 'win32'",
     "sqlite-vec>=0.1.6",
+    "typer>=0.15",
 ]
+
+[project.scripts]
+soundline = "soundline.interfaces.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/yamsdmc/soundline"
@@ -124,3 +128,6 @@ name = "ARC-004: interfaces go through the application, never through driven ada
 type = "forbidden"
 source_modules = ["soundline.interfaces"]
 forbidden_modules = ["soundline.adapters"]
+# Interfaces may reach adapters only through the facade, which is the composition root
+# (ARC-006, see the M1 note in docs/spec/02-architecture.md). Direct imports stay forbidden.
+ignore_imports = ["soundline.api -> soundline.adapters.**"]

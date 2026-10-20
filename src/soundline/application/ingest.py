@@ -34,6 +34,14 @@ class IngestionReport:
     def count(self, status: IngestionStatus) -> int:
         return sum(result.status is status for result in self.results)
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "results": [
+                {"source": r.source, "status": r.status.value, "reason": r.reason}
+                for r in self.results
+            ]
+        }
+
 
 class Ingestor:
     def __init__(self, index: Index, embedder: Embedder, chunking: ChunkingSettings) -> None:

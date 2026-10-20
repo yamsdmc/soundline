@@ -139,12 +139,26 @@ def open_database(path: str) -> sqlite3.Connection:
     return connection
 
 
-_COLUMNS = "source, text, start_offset, end_offset, metadata"
+_COLUMNS = "source, text, start_offset, end_offset, metadata, section_path"
 
 
-def _chunk(row: tuple[str, str, int, int, str]) -> Chunk:
-    source, text, start, end, metadata = row
-    return Chunk(source, text, Span(start, end), json.loads(metadata))
+def _chunk(row: tuple[str, str, int, int, str, str]) -> Chunk:
+    source, text, start, end, metadata, section_path = row
+    return Chunk(
+        source, text, Span(start, end), json.loads(metadata), tuple(json.loads(section_path))
+    )
+
+
+def _values(chunk: Chunk) -> tuple[str, str, int, int, str, str]:
+    """Column values in `_COLUMNS` order."""
+    return (
+        chunk.source,
+        chunk.text,
+        chunk.span.start,
+        chunk.span.end,
+        json.dumps(chunk.metadata),
+        json.dumps(chunk.section_path),
+    )
 
 
 def _where(condition: Filter | None) -> _Sql:
@@ -162,21 +176,14 @@ class SqliteLexicalIndex:
             "create virtual table if not exists chunk_fts using fts5("
             " text, source unindexed, chunk_id unindexed,"
             " start_offset unindexed, end_offset unindexed, metadata unindexed,"
+            " section_path unindexed,"
             " tokenize = 'unicode61')"
         )
 
     def add(self, chunk: Chunk) -> None:
         self._db.execute(
-            "insert into chunk_fts(text, source, chunk_id, start_offset, end_offset, metadata)"
-            " values (?, ?, ?, ?, ?, ?)",
-            (
-                chunk.text,
-                chunk.source,
-                chunk.id,
-                chunk.span.start,
-                chunk.span.end,
-                json.dumps(chunk.metadata),
-            ),
+            f"insert into chunk_fts(chunk_id, {_COLUMNS}) values (?, ?, ?, ?, ?, ?, ?)",
+            (chunk.id, *_values(chunk)),
         )
 
     def remove(self, source: str) -> None:
@@ -211,7 +218,7 @@ class SqliteVectorIndex:
             "create virtual table if not exists chunk_vec using vec0("
             f" embedding float[{dimension}] distance_metric=cosine,"
             " +source text, +text text, +start_offset integer, +end_offset integer,"
-            " +metadata text)"
+            " +metadata text, +section_path text)"
         )
 
     def add(self, chunk: Chunk, vector: tuple[float, ...]) -> None:
@@ -220,15 +227,8 @@ class SqliteVectorIndex:
                 f"vector dimension {len(vector)} differs from the index dimension {self._dimension}"
             )
         self._db.execute(
-            f"insert into chunk_vec(embedding, {_COLUMNS}) values (?, ?, ?, ?, ?, ?)",
-            (
-                sqlite_vec.serialize_float32(list(vector)),
-                chunk.source,
-                chunk.text,
-                chunk.span.start,
-                chunk.span.end,
-                json.dumps(chunk.metadata),
-            ),
+            f"insert into chunk_vec(embedding, {_COLUMNS}) values (?, ?, ?, ?, ?, ?, ?)",
+            (sqlite_vec.serialize_float32(list(vector)), *_values(chunk)),
         )
 
     def remove(self, source: str) -> None:

@@ -43,10 +43,17 @@ class LexicalIndexContract:
         assert index.search("When is rent due?", limit=5) == []
 
     def test_a_stored_chunk_is_returned_unchanged(self, index: LexicalIndex) -> None:
-        rent = Chunk(source="lease.md", text="Rent is due on the 5th.", span=Span(40, 63))
+        rent = Chunk(
+            source="lease.md",
+            text="Rent is due on the 5th.",
+            span=Span(40, 63),
+            metadata={"type": "contract", "year": 2024, "tags": ["rent"]},
+            section_path=("Lease", "Payment"),
+        )
         index.add(rent)
 
         assert index.search("rent", limit=5) == [rent]
+        assert index.search("rent", limit=5)[0].section_path == ("Lease", "Payment")
 
     def test_only_chunks_sharing_a_term_with_the_query_are_found(self, index: LexicalIndex) -> None:
         rent = _chunk("lease.md", "Rent is due on the 5th of each month.")
@@ -189,7 +196,9 @@ class VectorIndexContract:
     def test_the_nearest_vectors_come_first_and_chunks_are_returned_unchanged(
         self, index: VectorIndex
     ) -> None:
-        north = Chunk(source="north.md", text="North.", span=Span(10, 16))
+        north = Chunk(
+            source="north.md", text="North.", span=Span(10, 16), section_path=("Map", "North")
+        )
         east = _chunk("east.md", "East.")
         north_east = _chunk("north-east.md", "North-east.")
         index.add(east, _unit(0, 1, 0))
@@ -197,6 +206,7 @@ class VectorIndexContract:
         index.add(north_east, _unit(1, 1, 0))
 
         assert index.search(_unit(1, 0.1, 0), limit=2) == [north, north_east]
+        assert index.search(_unit(1, 0.1, 0), limit=1)[0].section_path == ("Map", "North")
 
     @pytest.mark.spec("RET-001")
     def test_no_more_hits_than_the_limit_are_returned(self, index: VectorIndex) -> None:

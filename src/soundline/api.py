@@ -13,8 +13,10 @@ from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import Embedder, Index, LanguageModel, SourceReader
 from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
+from soundline.domain.errors import ConfigurationError
 from soundline.domain.filters import Filter, Metadata, parse_filter
 from soundline.domain.hits import Hit
+from soundline.domain.manifest import Manifest
 from soundline.testing import (
     HashingEmbedder,
     InMemoryDocumentStore,
@@ -29,7 +31,7 @@ class Soundline:
         self,
         index: Index,
         embedder: Embedder,
-        llm: LanguageModel,
+        llm: LanguageModel | None,
         chunking: ChunkingSettings | None = None,
         *,
         reader: SourceReader | None = None,
@@ -47,7 +49,7 @@ class Soundline:
     def open(
         cls,
         home: str | Path,
-        llm: LanguageModel,
+        llm: LanguageModel | None = None,
         embedder: Embedder | None = None,
         chunking: ChunkingSettings | None = None,
     ) -> Self:
@@ -138,13 +140,37 @@ class Soundline:
         return self._retriever.hits(query, k, condition)
 
     def ask(self, question: str) -> Answer:
+        if self._llm is None:
+            raise ConfigurationError(  # CLI-004
+                "asking needs a language model; configure one (generation.model) or use search"
+            )
         return ask(question, self._retriever, self._llm)
+
+    def manifest(self) -> Manifest | None:
+        """How this index was built, or None while it is empty (STO-004)."""
+        return self._index.manifest.load()
+
+
+DEFAULT_EMBEDDER = "fastembed:intfloat/multilingual-e5-large"  # CFG-023
+
+
+def embedder_from_spec(spec: str) -> Embedder:
+    """`<provider>:<model>` (CFG-010): `fastembed:<model>`, or `hashing:<dimension>` (offline,
+    deterministic, no semantics: for tests and demos)."""
+    provider, _, model = spec.partition(":")
+    if provider == "fastembed" and model:
+        from soundline.adapters.embedders.fastembed import FastembedEmbedder  # noqa: PLC0415
+
+        return FastembedEmbedder(model)
+    if provider == "hashing" and model.isdigit():
+        return HashingEmbedder(dimension=int(model))
+    raise ConfigurationError(
+        f"unknown embedder {spec!r}; use 'fastembed:<model>' or 'hashing:<dimension>'"
+    )
 
 
 def _default_embedder() -> Embedder:
-    from soundline.adapters.embedders.fastembed import FastembedEmbedder  # noqa: PLC0415
-
-    return FastembedEmbedder("intfloat/multilingual-e5-large")  # CFG-023
+    return embedder_from_spec(DEFAULT_EMBEDDER)
 
 
 def _local_files() -> SourceReader:
