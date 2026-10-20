@@ -34,4 +34,9 @@ This confirms the risk on a real developer machine. It concerns a 3.10 build, be
 
 - **apsw**: works, but its API differs from DB-API, so the adapter would have to be written twice or wrapped.
 - **pysqlite3-binary**: Linux wheels only.
+
+## Platform notes (from CI)
+
+- **Windows**: `sqlean.py` publishes no Windows wheels, so installing it there falls back to building from source, which fails on CI runners. It is therefore a dependency only when `sys_platform != 'win32'`, and imported optionally. CPython Windows builds load extensions natively, so the standard library binding is used.
+- **macOS**: runner toolcache Pythons may be built without extension loading; tests must never assume the running Python's capability (binding selection is tested with fake bindings). Test jobs use uv-managed Pythons for determinism; the probe job deliberately uses the runner's own Python to exercise the fallback.
 - **Documenting "install a Python with extension support"**: breaks the five-minute quickstart promise.

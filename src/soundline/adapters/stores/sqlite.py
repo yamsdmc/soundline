@@ -6,7 +6,6 @@ from functools import cache
 from types import ModuleType
 from typing import Any
 
-import sqlean  # pyright: ignore[reportMissingTypeStubs]
 import sqlite_vec
 
 from soundline.domain.chunks import Chunk
@@ -113,11 +112,20 @@ def choose_binding(bindings: Sequence[ModuleType | Any]) -> ModuleType | Any:
     raise RuntimeError("no SQLite binding on this Python can load extensions")
 
 
+def _available_bindings() -> list[ModuleType]:
+    bindings: list[ModuleType] = [sqlite3]
+    try:
+        import sqlean  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+    except ImportError:  # not installed on Windows, see ADR 0012
+        return bindings
+    return [*bindings, sqlean]
+
+
 @cache
 def _process_binding() -> ModuleType | Any:
     # Chosen once per process: sqlite-vec keeps a global pointer to the SQLite API that
     # loaded it, so loading it into two different SQLite libraries aborts the process.
-    return choose_binding((sqlite3, sqlean))
+    return choose_binding(_available_bindings())
 
 
 def open_database(path: str) -> sqlite3.Connection:

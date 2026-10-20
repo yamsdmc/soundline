@@ -9,13 +9,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Deterministic interpreters: runner toolcache Pythons differ per OS (e.g. some cannot load
+  # SQLite extensions). The fallback for such Pythons is exercised by the sqlite-probe job.
+  UV_PYTHON_PREFERENCE: only-managed
+
 jobs:
   quality:
     name: Lint, types, architecture, spec traceability
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
       - run: uv sync --locked
@@ -36,12 +41,19 @@ jobs:
     env:
       HYPOTHESIS_PROFILE: ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python }}
       - run: uv sync --locked
+      - name: Show the SQLite binding in use
+        shell: bash
+        run: >-
+          uv run python -c "import sys, sqlite3; from soundline.adapters.stores.sqlite import
+          open_database; print(sys.version, '| stdlib can load extensions:',
+          hasattr(sqlite3.Connection, 'enable_load_extension'), '| binding:',
+          type(open_database(':memory:')).__module__)"
       - run: uv run pytest -n auto
 
   sqlite-probe:
@@ -51,7 +63,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      # The runner's own Python on purpose: this is what users without uv-managed Pythons get.
+      UV_PYTHON_PREFERENCE: system
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv run --no-project --python 3.12 --with sqlite-vec --with sqlean.py python -I scripts/probe_sqlite.py
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+      - name: Probe (sqlean.py has no Windows wheels)
+        shell: bash
+        run: >-
+          uv run --no-project --python 3.12 --with sqlite-vec
+          ${{ runner.os != 'Windows' && '--with sqlean.py' || '' }}
+          python -I scripts/probe_sqlite.py

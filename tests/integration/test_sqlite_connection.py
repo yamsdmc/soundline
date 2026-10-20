@@ -1,33 +1,41 @@
-import sqlite3
 from types import SimpleNamespace
 
 import pytest
-import sqlean  # pyright: ignore[reportMissingTypeStubs]
 
 from soundline.adapters.stores.sqlite import choose_binding, open_database
 
 
-class _ConnectionWithoutExtensions:
-    """Mimics sqlite3 builds compiled without extension loading (e.g. some pyenv builds)."""
-
+class _Connection:
     def close(self) -> None: ...
 
 
-def _connect_without_extensions(path: str) -> _ConnectionWithoutExtensions:
-    return _ConnectionWithoutExtensions()
+class _ConnectionWithExtensions(_Connection):
+    def enable_load_extension(self, enabled: bool) -> None: ...
 
 
-NO_EXTENSIONS = SimpleNamespace(connect=_connect_without_extensions)
+def _binding(connection_type: type[_Connection]) -> SimpleNamespace:
+    """A fake DB-API module. Tests must not depend on how the running Python was built:
+    some builds (e.g. CI toolcache Pythons on macOS) cannot load SQLite extensions."""
+
+    def connect(path: str) -> _Connection:
+        return connection_type()
+
+    return SimpleNamespace(connect=connect)
+
+
+CAPABLE = _binding(_ConnectionWithExtensions)
+ALSO_CAPABLE = _binding(_ConnectionWithExtensions)
+NO_EXTENSIONS = _binding(_Connection)
 
 
 @pytest.mark.spec("ARC-014")
-def test_the_standard_library_binding_is_chosen_when_it_can_load_extensions():
-    assert choose_binding((sqlite3, sqlean)) is sqlite3
+def test_the_first_binding_able_to_load_extensions_is_chosen():
+    assert choose_binding((CAPABLE, ALSO_CAPABLE)) is CAPABLE
 
 
 @pytest.mark.spec("ARC-014")
 def test_a_binding_that_cannot_load_extensions_is_skipped_for_the_next_one():
-    assert choose_binding((NO_EXTENSIONS, sqlean)) is sqlean
+    assert choose_binding((NO_EXTENSIONS, CAPABLE)) is CAPABLE
 
 
 @pytest.mark.spec("ARC-014")
@@ -37,7 +45,7 @@ def test_a_clear_error_is_raised_when_no_binding_can_load_extensions():
 
 
 @pytest.mark.spec("ARC-014")
-def test_an_opened_database_has_sqlite_vec_loaded():
+def test_an_opened_database_has_sqlite_vec_loaded_whatever_binding_this_python_needs():
     database = open_database(":memory:")
 
     assert database.execute("select vec_version()").fetchone()[0].startswith("v")
