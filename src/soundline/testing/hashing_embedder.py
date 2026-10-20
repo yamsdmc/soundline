@@ -1,4 +1,5 @@
 import hashlib
+import json
 import math
 import re
 from collections.abc import Sequence
@@ -19,6 +20,13 @@ class HashingEmbedder:
     def __init__(self, dimension: int = 256, synonyms: dict[str, str] | None = None) -> None:
         self._dimension = dimension
         self._synonyms: dict[str, str] = synonyms or {}
+
+    @property
+    def model_id(self) -> str:
+        if not self._synonyms:
+            return f"hashing:{self._dimension}"
+        digest = hashlib.sha256(json.dumps(self._synonyms, sort_keys=True).encode()).hexdigest()
+        return f"hashing:{self._dimension}:{digest[:12]}"
 
     @property
     def dimension(self) -> int:

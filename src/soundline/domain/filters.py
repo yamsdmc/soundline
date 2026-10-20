@@ -13,6 +13,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
+from soundline.domain.errors import SoundlineError
+
 type Scalar = str | int | float | bool
 type Metadata = Mapping[str, Scalar | Sequence[str]]
 type ComparisonOperator = Literal["eq", "ne", "gt", "gte", "lt", "lte"]
@@ -21,7 +23,7 @@ type MembershipOperator = Literal["in", "nin"]
 _COMPARISONS: tuple[ComparisonOperator, ...] = ("eq", "ne", "gt", "gte", "lt", "lte")
 
 
-class InvalidFilterError(ValueError):
+class InvalidFilterError(SoundlineError, ValueError):
     code = "invalid_filter"
 
 

@@ -11,6 +11,7 @@ import sqlite_vec
 from soundline.application.ports import StoredDocument
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import And, Compare, Exists, Filter, Member, Not, Or, Scalar
+from soundline.domain.manifest import Manifest
 from soundline.domain.quotes import Span
 
 _TERM = re.compile(r"\w+")
@@ -278,3 +279,21 @@ class SqliteDocumentStore:
 
     def sources(self) -> list[str]:
         return [row[0] for row in self._db.execute("select source from document order by source")]
+
+
+class SqliteManifestStore:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._db = connection
+        self._db.execute(
+            "create table if not exists manifest(id integer primary key check (id = 1),"
+            " components text not null)"
+        )
+
+    def load(self) -> Manifest | None:
+        row = self._db.execute("select components from manifest where id = 1").fetchone()
+        return Manifest.from_json(row[0]) if row else None
+
+    def save(self, manifest: Manifest) -> None:
+        self._db.execute(
+            "insert or replace into manifest(id, components) values (1, ?)", (manifest.to_json(),)
+        )

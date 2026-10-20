@@ -19,12 +19,14 @@ from soundline.application.ports import (
     DocumentStore,
     Embedder,
     LexicalIndex,
+    ManifestStore,
     StoredDocument,
     Vector,
     VectorIndex,
 )
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import F
+from soundline.domain.manifest import Manifest
 from soundline.domain.quotes import Span
 
 
@@ -137,6 +139,11 @@ class EmbedderContract:
         for vector in vectors:
             assert len(vector) == embedder.dimension
             assert math.isclose(math.sqrt(sum(x * x for x in vector)), 1.0, rel_tol=1e-3)
+
+    @pytest.mark.spec("ING-073")
+    def test_the_model_id_names_the_embedding_space(self, embedder: Embedder) -> None:
+        assert isinstance(embedder.model_id, str)
+        assert embedder.model_id
 
     def test_embedding_is_deterministic(self, embedder: Embedder) -> None:
         assert embedder.embed_query("When is rent due?") == embedder.embed_query(
@@ -256,3 +263,20 @@ class DocumentStoreContract:
 
         assert store.get("lease.md") is None
         assert store.sources() == ["rules.md"]
+
+
+class ManifestStoreContract:
+    @pytest.fixture
+    def store(self) -> ManifestStore:
+        raise NotImplementedError
+
+    @pytest.mark.spec("STO-001")
+    def test_a_new_index_has_no_manifest(self, store: ManifestStore) -> None:
+        assert store.load() is None
+
+    @pytest.mark.spec("STO-001")
+    def test_the_saved_manifest_is_loaded_back(self, store: ManifestStore) -> None:
+        manifest = Manifest({"embedder": {"model_id": "hashing:256", "dimension": 256}})
+        store.save(manifest)
+
+        assert store.load() == manifest

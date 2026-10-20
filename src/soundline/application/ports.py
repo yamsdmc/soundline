@@ -1,11 +1,13 @@
 """Ports: what the application needs from the outside world (see docs/spec/02-architecture.md)."""
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import Filter
+from soundline.domain.manifest import Manifest
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,11 @@ type Vector = tuple[float, ...]
 
 class Embedder(Protocol):
     @property
+    def model_id(self) -> str:
+        """Names the embedding space: vectors from different model IDs never mix (ING-073)."""
+        ...
+
+    @property
     def dimension(self) -> int: ...
 
     def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
@@ -89,10 +96,19 @@ class VectorIndex(Protocol):
         ...
 
 
+class ManifestStore(Protocol):
+    def load(self) -> Manifest | None: ...
+
+    def save(self, manifest: Manifest) -> None: ...
+
+
 @dataclass(frozen=True)
 class Index:
-    """All persisted data of a corpus (see the glossary): documents and both search indexes."""
+    """All persisted data of a corpus (see the glossary): documents, both search indexes and
+    the manifest, plus how to make several writes atomic (STO-020)."""
 
     documents: DocumentStore
     lexical: LexicalIndex
     dense: VectorIndex
+    manifest: ManifestStore
+    transaction: Callable[[], AbstractContextManager[object]] = field(default=nullcontext)

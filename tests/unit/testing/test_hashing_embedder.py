@@ -14,3 +14,14 @@ def test_texts_without_shared_words_are_unrelated_unless_declared_synonyms():
 
     assert similarity(plain) < 0.5
     assert similarity(bilingual) > 0.99
+
+
+def test_hashing_embedders_with_different_vectors_have_different_model_ids():
+    ids = {
+        HashingEmbedder().model_id,
+        HashingEmbedder(dimension=128).model_id,
+        HashingEmbedder(synonyms={"pay": "payable"}).model_id,
+    }
+
+    assert len(ids) == 3
+    assert HashingEmbedder().model_id == HashingEmbedder().model_id
