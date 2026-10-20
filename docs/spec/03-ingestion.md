@@ -44,6 +44,8 @@ Source, document, revision, parsed document, element, normalized text, offset ma
 ### Parsing
 
 - **ING-020** Every parser MUST produce normalized text: Unicode NFC, line endings normalized to `\n`, runs of horizontal whitespace collapsed to one space, at most two consecutive newlines, and no leading or trailing whitespace on the document.
+  **Code blocks are exempt from whitespace collapsing**: only their line endings are unified, because indentation and spacing are part of their meaning. Whitespace adjacent to a line break is removed in prose.
+  > Refined in M2: applying the rule to code destroyed indentation; found while test-driving the Markdown parser.
 - **ING-021** Every parser MUST produce an offset map such that any span of normalized text can be resolved to a location: page (PDF, DOCX when available), line range (text, Markdown, code), and section path.
 - **ING-022** Markdown and HTML parsers MUST recognize headings (with level), paragraphs, lists, tables, code blocks and block quotes as elements.
 - **ING-023** HTML parsing MUST drop scripts, styles, navigation and other non-content markup. Visible text is preserved.
