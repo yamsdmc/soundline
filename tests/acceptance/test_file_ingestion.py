@@ -103,3 +103,23 @@ def test_symbolic_links_are_not_followed(
     report = soundline.ingest([docs])
 
     assert "private.md" not in statuses(report)
+
+
+@pytest.mark.spec("ING-022", "ING-023", "ING-047")
+def test_html_pages_are_ingested_by_structure_without_scripts_or_navigation(
+    soundline: Soundline, tmp_path: Path
+):
+    page = tmp_path / "lease.html"
+    page.write_text(
+        "<html><head><title>Lease</title><script>var token = 'zebra';</script></head><body>"
+        "<nav><a href='/'>Home</a></nav><h1>Lease</h1><h2>Payment</h2>"
+        "<p>Rent is due on the <b>5th</b>.</p></body></html>"
+    )
+
+    report = soundline.ingest([page])
+
+    assert statuses(report) == {"lease.html": IngestionStatus.ADDED}
+    hit = soundline.search("rent due")[0]
+    assert hit.text == "Payment\n\nRent is due on the 5th."
+    assert hit.section_path == ("Lease", "Payment")
+    assert all("zebra" not in hit.text for hit in soundline.search("zebra token"))

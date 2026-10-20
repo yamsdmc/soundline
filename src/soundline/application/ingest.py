@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -6,7 +7,9 @@ from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import Embedder, Index, StoredDocument
 from soundline.domain.chunking import ChunkingSettings, chunk_document
 from soundline.domain.chunks import Chunk
+from soundline.domain.documents import ParsedDocument
 from soundline.domain.filters import Metadata
+from soundline.domain.html import parse_html
 from soundline.domain.markdown import parse_markdown
 
 
@@ -43,6 +46,13 @@ class IngestionReport:
         }
 
 
+PARSERS: dict[str, Callable[[str], ParsedDocument]] = {
+    "text/markdown": parse_markdown,
+    "text/plain": parse_markdown,  # plain text is valid Markdown
+    "text/html": parse_html,
+}
+
+
 class Ingestor:
     def __init__(self, index: Index, embedder: Embedder, chunking: ChunkingSettings) -> None:
         self._index = index
@@ -54,7 +64,11 @@ class Ingestor:
         self._chunking = chunking
 
     def ingest_text(
-        self, source: str, text: str, metadata: Metadata | None = None
+        self,
+        source: str,
+        text: str,
+        metadata: Metadata | None = None,
+        media_type: str = "text/markdown",
     ) -> IngestionStatus:
         check_pipeline(self._index.manifest, self._manifest)  # STO-010
         revision = hashlib.sha256(text.encode()).hexdigest()
@@ -62,7 +76,7 @@ class Ingestor:
         if previous and previous.revision == revision:
             return IngestionStatus.UNCHANGED  # ING-007: no parse, no embedding, no write
 
-        document = parse_markdown(text)
+        document = PARSERS[media_type](text)
         chunks = [
             Chunk(
                 source=source,

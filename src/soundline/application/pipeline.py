@@ -3,7 +3,7 @@ from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.errors import IndexMismatchError
 from soundline.domain.manifest import Manifest
 
-PARSER_VERSION = "soundline.markdown@1"
+PARSER_VERSIONS = {"markdown": "soundline.markdown@1", "html": "soundline.html@1"}
 CHUNKER_VERSION = "soundline.structural@1"
 
 
@@ -11,7 +11,7 @@ def pipeline_manifest(embedder: Embedder, chunking: ChunkingSettings) -> Manifes
     """Every setting that changes what gets stored, and nothing query-time (STO-002)."""
     return Manifest(
         {
-            "parser": PARSER_VERSION,
+            "parsers": PARSER_VERSIONS,
             "chunker": {
                 "strategy": CHUNKER_VERSION,
                 "max_tokens": chunking.max_tokens,
