@@ -83,7 +83,7 @@ def test_a_pipeline_mismatch_is_a_configuration_error(
     result = run("search", "rent")
 
     assert result.exit_code == 3
-    assert "reindex" in result.output
+    assert "rebuild the index" in result.output
 
 
 @pytest.mark.spec("STO-004")
@@ -109,3 +109,39 @@ def test_sync_deletes_vanished_files(run: Run, docs: Path):
 
     statuses = {Path(r["source"]).name: r["status"] for r in json.loads(result.stdout)["results"]}
     assert statuses == {"lease.md": "unchanged", "rules.md": "deleted"}
+
+
+@pytest.mark.spec("CLI-005", "ARC-014")
+def test_doctor_checks_each_component_with_a_real_call(run: Run, docs: Path):
+    run("ingest", str(docs))
+
+    result = run("doctor", "--json")
+
+    assert result.exit_code == 0
+    checks = {check["name"]: check for check in json.loads(result.stdout)["checks"]}
+    assert set(checks) >= {"sqlite", "embedder", "index"}
+    assert all(check["ok"] for check in checks.values())
+    assert "sqlite-vec v" in checks["sqlite"]["detail"]
+    assert "2 documents" in checks["index"]["detail"]
+
+
+@pytest.mark.spec("CLI-005", "STO-010")
+def test_doctor_reports_an_incompatible_index_with_the_fix(
+    run: Run, docs: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run("ingest", str(docs))
+    monkeypatch.setenv("SOUNDLINE_EMBEDDER", "hashing:128")
+
+    result = run("doctor")
+
+    assert result.exit_code == 3
+    assert "rebuild the index" in result.output
+
+
+def test_init_creates_the_home_and_says_what_to_do_next(run: Run, tmp_path: Path):
+    result = run("init")
+
+    assert result.exit_code == 0
+    assert (tmp_path / "home").is_dir()
+    assert "soundline ingest" in result.output
+    assert run("init").exit_code == 0  # idempotent

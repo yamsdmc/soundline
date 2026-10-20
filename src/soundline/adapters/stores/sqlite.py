@@ -130,6 +130,14 @@ def _process_binding() -> ModuleType | Any:
     return choose_binding(_available_bindings())
 
 
+def describe_database(connection: sqlite3.Connection) -> str:
+    sqlite_version, vec_version = connection.execute(
+        "select sqlite_version(), vec_version()"
+    ).fetchone()
+    binding = type(connection).__module__.split(".")[0]
+    return f"{binding} binding, SQLite {sqlite_version}, sqlite-vec {vec_version}"
+
+
 def open_database(path: str) -> sqlite3.Connection:
     """Opens a SQLite database with sqlite-vec loaded."""
     connection = _process_binding().connect(path)

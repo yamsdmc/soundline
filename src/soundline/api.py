@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Self
 
 from soundline.application.ask import ask
+from soundline.application.diagnostics import Check, diagnose
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
 from soundline.application.ingest_sources import ingest_sources
@@ -38,6 +39,7 @@ class Soundline:
     ) -> None:
         chunking = chunking or ChunkingSettings()
         self._index = index
+        self._embedder = embedder
         self._documents = index.documents
         self._manifest = pipeline_manifest(embedder, chunking)
         self._ingestor = Ingestor(index, embedder, chunking)
@@ -59,6 +61,7 @@ class Soundline:
             SqliteLexicalIndex,
             SqliteManifestStore,
             SqliteVectorIndex,
+            describe_database,
             open_database,
         )
 
@@ -72,6 +75,7 @@ class Soundline:
             SqliteManifestStore(database),
             transaction=lambda: database,  # commits on success, rolls back on error
             close=database.close,
+            describe=lambda: describe_database(database),
         )
         return cls(index, embedder, llm, chunking)
 
@@ -151,6 +155,10 @@ class Soundline:
                 "asking needs a language model; configure one (generation.model) or use search"
             )
         return ask(question, self._retriever, self._llm)
+
+    def diagnose(self) -> list[Check]:
+        """Checks storage, embedder and index compatibility with real calls (CLI-005)."""
+        return diagnose(self._index, self._embedder, self._manifest)
 
     def manifest(self) -> Manifest | None:
         """How this index was built, or None while it is empty (STO-004)."""

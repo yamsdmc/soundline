@@ -106,6 +106,28 @@ def search(
         typer.echo(f"   {hit.text[:200]}")
 
 
+@app.command(help="Create the Soundline home directory.")
+def init() -> None:
+    home = Path(os.environ.get("SOUNDLINE_HOME", ".soundline"))
+    existed = home.is_dir()
+    home.mkdir(parents=True, exist_ok=True)
+    typer.echo(f"{'Already initialized' if existed else 'Initialized'}: {home.resolve()}")
+    typer.echo('Next: soundline ingest <files or directories>, then soundline search "..."')
+
+
+@app.command(help="Check storage, embedder and index with real calls.")
+def doctor(as_json: JsonOption = False) -> None:
+    with _soundline() as soundline:
+        checks = soundline.diagnose()
+    if as_json:
+        typer.echo(json.dumps({"checks": [vars(check) for check in checks]}))
+    else:
+        for check in checks:
+            typer.echo(f"{'ok  ' if check.ok else 'FAIL'} {check.name:<9} {check.detail}")
+    if not all(check.ok for check in checks):
+        raise typer.Exit(CONFIGURATION_ERROR)
+
+
 @inspect_app.command("manifest", help="How the index was built (STO-004).")
 def inspect_manifest(as_json: JsonOption = False) -> None:
     with _soundline() as soundline:

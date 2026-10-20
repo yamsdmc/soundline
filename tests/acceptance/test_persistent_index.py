@@ -47,7 +47,7 @@ def test_an_index_refuses_a_pipeline_it_was_not_built_with(
         soundline.ingest_text("lease.md", "Rent is due on the 5th.")
 
     with open_index(tmp_path, **changed) as mismatched:  # pyright: ignore[reportArgumentType]
-        with pytest.raises(IndexMismatchError, match="reindex"):
+        with pytest.raises(IndexMismatchError, match="rebuild the index"):
             mismatched.ingest_text("rules.md", "No smoking.")
         with pytest.raises(IndexMismatchError):
             mismatched.search("rent")

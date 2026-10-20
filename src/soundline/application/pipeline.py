@@ -34,5 +34,6 @@ def check_pipeline(store: ManifestStore, current: Manifest) -> None:
         changed = ", ".join(built.differences(current))
         raise IndexMismatchError(
             f"this index was built with a different {changed} than the current configuration;"
-            " restore the previous configuration, or run `soundline reindex` to rebuild it"
+            " restore the previous configuration, or rebuild the index: delete its directory"
+            " and ingest again (an in-place `soundline reindex` is planned, STO-013)"
         )

@@ -139,3 +139,5 @@ class Index:
     transaction: Callable[[], AbstractContextManager[object]] = field(default=nullcontext)
     close: Callable[[], object] = field(default=lambda: None)
     """Releases the index's resources (e.g. its database connection)."""
+    describe: Callable[[], str] = field(default=lambda: "in-memory store")
+    """What the storage is, for diagnostics (e.g. SQLite binding and versions)."""
