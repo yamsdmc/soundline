@@ -61,3 +61,41 @@ class SqliteLexicalIndex:
             (" OR ".join(f'"{term}"' for term in terms), limit),
         )
         return [Chunk(source, body, Span(start, end)) for source, body, start, end in rows]
+
+
+class SqliteVectorIndex:
+    """Exact (brute-force) cosine search with sqlite-vec (STO-041, STO-042)."""
+
+    def __init__(self, connection: sqlite3.Connection, dimension: int) -> None:
+        self._db = connection
+        self._dimension = dimension
+        self._db.execute(
+            "create virtual table if not exists chunk_vec using vec0("
+            f" embedding float[{dimension}] distance_metric=cosine,"
+            " +source text, +text text, +start_offset integer, +end_offset integer)"
+        )
+
+    def add(self, chunk: Chunk, vector: tuple[float, ...]) -> None:
+        if len(vector) != self._dimension:
+            raise ValueError(
+                f"vector dimension {len(vector)} differs from the index dimension {self._dimension}"
+            )
+        self._db.execute(
+            "insert into chunk_vec(embedding, source, text, start_offset, end_offset)"
+            " values (?, ?, ?, ?, ?)",
+            (
+                sqlite_vec.serialize_float32(list(vector)),
+                chunk.source,
+                chunk.text,
+                chunk.span.start,
+                chunk.span.end,
+            ),
+        )
+
+    def search(self, vector: tuple[float, ...], limit: int) -> list[Chunk]:
+        rows = self._db.execute(
+            "select source, text, start_offset, end_offset from chunk_vec"
+            " where embedding match ? and k = ? order by distance",
+            (sqlite_vec.serialize_float32(list(vector)), limit),
+        )
+        return [Chunk(source, body, Span(start, end)) for source, body, start, end in rows]

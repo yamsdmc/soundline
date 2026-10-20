@@ -37,3 +37,13 @@ class LexicalIndex(Protocol):
     def add(self, chunk: Chunk) -> None: ...
 
     def search(self, text: str, limit: int) -> list[Chunk]: ...
+
+
+class VectorIndex(Protocol):
+    def add(self, chunk: Chunk, vector: Vector) -> None:
+        """Raises ValueError when the vector's dimension differs from the index's (STO-011)."""
+        ...
+
+    def search(self, vector: Vector, limit: int) -> list[Chunk]:
+        """Nearest chunks first, by cosine similarity (RET-021)."""
+        ...

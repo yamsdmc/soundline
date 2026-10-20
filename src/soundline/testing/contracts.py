@@ -15,7 +15,7 @@ import math
 
 import pytest
 
-from soundline.application.ports import Embedder, LexicalIndex, Vector
+from soundline.application.ports import Embedder, LexicalIndex, Vector, VectorIndex
 from soundline.domain.chunks import Chunk
 from soundline.domain.quotes import Span
 
@@ -116,3 +116,43 @@ class EmbedderContract:
         query = embedder.embed_query("When is the rent due?")
 
         assert _cosine(query, related) > _cosine(query, unrelated)
+
+
+def _unit(*components: float) -> Vector:
+    norm = math.sqrt(sum(x * x for x in components))
+    return tuple(x / norm for x in components)
+
+
+class VectorIndexContract:
+    """Indexes are built with dimension 3 by the fixture."""
+
+    @pytest.fixture
+    def index(self) -> VectorIndex:
+        raise NotImplementedError
+
+    def test_searching_an_empty_index_finds_nothing(self, index: VectorIndex) -> None:
+        assert index.search(_unit(1, 0, 0), limit=5) == []
+
+    def test_the_nearest_vectors_come_first_and_chunks_are_returned_unchanged(
+        self, index: VectorIndex
+    ) -> None:
+        north = Chunk(source="north.md", text="North.", span=Span(10, 16))
+        east = _chunk("east.md", "East.")
+        north_east = _chunk("north-east.md", "North-east.")
+        index.add(east, _unit(0, 1, 0))
+        index.add(north, _unit(1, 0, 0))
+        index.add(north_east, _unit(1, 1, 0))
+
+        assert index.search(_unit(1, 0.1, 0), limit=2) == [north, north_east]
+
+    @pytest.mark.spec("RET-001")
+    def test_no_more_hits_than_the_limit_are_returned(self, index: VectorIndex) -> None:
+        for n in range(5):
+            index.add(_chunk(f"{n}.md", f"Note {n}."), _unit(1, n, 0))
+
+        assert len(index.search(_unit(1, 0, 0), limit=3)) == 3
+
+    @pytest.mark.spec("STO-011")
+    def test_a_vector_of_the_wrong_dimension_is_rejected(self, index: VectorIndex) -> None:
+        with pytest.raises(ValueError, match="dimension"):
+            index.add(_chunk("flat.md", "Flat."), _unit(1, 0))
