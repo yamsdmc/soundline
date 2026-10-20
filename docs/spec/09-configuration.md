@@ -67,6 +67,7 @@ query_rewrite = "followups"         # "none" | "followups" | "multi"
 [generation]
 model = "anthropic:claude-sonnet-5-5"
 context_budget_tokens = 6000
+history_budget_tokens = 1500        # GEN-062
 max_output_tokens = 1024
 temperature = 0.0
 fuzzy_quote_threshold = 0.9
@@ -80,6 +81,7 @@ instructions = ""
 judge_model = ""                    # empty = generation model (one API key); reports warn about self-judging (EVL-042)
 bootstrap_resamples = 2000
 seed = 42
+allow_router_fallback = false     # CFG-015
 
 [observability]
 otel = false
@@ -109,6 +111,10 @@ The values above are illustrative defaults. The generated `soundline.toml` from 
 - **CFG-012** Each provider block MAY set timeouts, max retries, max concurrency and rate limits (requests and tokens per minute). Soundline enforces client-side rate limiting.
 - **CFG-013** A fully local setup (fastembed + Ollama, or another OpenAI-compatible local server) MUST be documented and covered by an integration test. This setup sends no data to any external service.
 - **CFG-014** Using a provider whose extra is not installed fails with the exact `pip install "soundline[...]"` command (ARC-012).
+- **CFG-015** **Routing providers** (OpenRouter, LiteLLM proxies and similar) MAY be used through the OpenAI-compatible adapter. Because a router can silently serve another model or provider:
+  - each model call records the model **and** provider actually served, as returned by the router, in the trace and in eval runs (feeds EVL-056);
+  - **automatic fallback is disabled during evaluation runs** (`soundline eval …`), so that results stay reproducible (EVL-061). A call that the router could only serve through a fallback fails instead. `evaluation.allow_router_fallback = true` overrides this, and the report then says so;
+  - outside evaluation, fallbacks are allowed, and each one is recorded as a trace event.
 
 ## Defaults policy
 

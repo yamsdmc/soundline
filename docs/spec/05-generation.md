@@ -96,6 +96,10 @@ Verification compares a quote with the cited evidence text, under a **matching l
 
 - **GEN-060** `ask` accepts an optional conversation history (previous questions and answers). History is used for follow-up condensation (RET-071) and passed to the model as context. Previous answers are **not** evidence and cannot be cited.
 - **GEN-061** A `Conversation` helper MAY keep history in memory for the Python API and CLI `chat`. Server-side persistence of conversations is out of scope for 1.0. The HTTP API is stateless and history is sent by the client.
+- **GEN-062** **Generation prompt budget.** The prompt is assembled by priority: (1) system prompt and output instructions, never truncated; (2) the question; (3) evidence, within the context budget (RET-080); (4) conversation history, within `history_budget_tokens` (default 1500). History is packed **newest turn first** until the budget is reached, then rendered in chronological order. Older turns are dropped whole, never cut mid-turn. The trace records how many turns were dropped.
+- **GEN-063** History carries the text of previous questions and answers only. Previous citations and evidence are **not** carried over: a claim in a follow-up answer must be supported by evidence retrieved for that turn (GEN-060). There is no inherited provenance.
+- **GEN-064** Generation budgets (RET-080, GEN-062, GEN-071) are counted with the **provider's exact tokenizer** when one is available (a local tokenizer or a token-counting endpoint, cached). Otherwise a documented **conservative** estimate is used, one that over-counts, because 4 characters per token under-counts French, CJK text and code. The method used is recorded in the trace.
+  > Added after reviewing the author's article on context engineering: the spec budgeted evidence but not history, and did not say which tokenizer counts the LLM budget.
 
 ### Cost and limits
 

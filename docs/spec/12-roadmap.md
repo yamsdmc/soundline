@@ -80,7 +80,7 @@ assert answer.citations[0].quote == "Rent is due on the 5th"
 - Streaming with verified claims (post-generation emission is acceptable, GEN-051 note), conversations and follow-up condensation.
 - Usage and cost accounting. CLI `ask` and `chat`.
 
-**Spec:** GEN-001→051, GEN-060→071, RET-070→071, RET-080→083, OBS-020.
+**Spec:** GEN-001→051, GEN-060→071 (including GEN-062→064), CFG-015, RET-070→071, RET-080→083, OBS-020.
 
 **Done when:** INV-GEN-1 and INV-GEN-5 hold on the smoke dataset with real models, and a fully local setup (Ollama) answers with verified citations.
 
