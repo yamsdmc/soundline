@@ -6,7 +6,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from soundline.domain.chunking import chunk_document
-from soundline.domain.markdown import ParsedDocument, parse_markdown
+from soundline.domain.documents import ParsedDocument
+from soundline.domain.markdown import parse_markdown
 
 
 def words(text: str) -> int:

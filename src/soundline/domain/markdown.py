@@ -6,25 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import accumulate
 
+from soundline.domain.documents import Block, ParsedDocument, assemble
 from soundline.domain.normalization import NormalizedText, normalize
-from soundline.domain.quotes import Span
 
 _HEADING = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t#]*$")
 _LIST_ITEM = re.compile(r"^[ \t]*([-*+]|\d+[.)])[ \t]+\S")
 _FENCE = "```"
-_SEPARATOR = "\n\n"
-
-
-@dataclass(frozen=True)
-class Element:
-    kind: str  # heading | paragraph | list_item | table | code
-    span: Span
-    level: int = 0  # heading level, 0 otherwise
-
-
-@dataclass(frozen=True)
-class ParsedDocument(NormalizedText):
-    elements: tuple[Element, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,16 +33,7 @@ class _Line:
 
 
 def parse_markdown(raw: str) -> ParsedDocument:
-    pieces = [(kind, level, text) for kind, level, text in _blocks(_lines(raw)) if text.text]
-    text, origins, elements = "", list[int](), list[Element]()
-    for kind, level, piece in pieces:
-        if text:
-            text += _SEPARATOR
-            origins += [piece.origins[0]] * len(_SEPARATOR)
-        elements.append(Element(kind, Span(len(text), len(text) + len(piece.text)), level))
-        text += piece.text
-        origins += piece.origins
-    return ParsedDocument(text, tuple(origins), len(raw), tuple(elements))
+    return assemble(_blocks(_lines(raw)), len(raw))
 
 
 def _lines(raw: str) -> list[_Line]:
@@ -67,8 +45,8 @@ def _lines(raw: str) -> list[_Line]:
     return lines
 
 
-def _blocks(lines: list[_Line]) -> list[tuple[str, int, NormalizedText]]:
-    blocks: list[tuple[str, int, NormalizedText]] = []
+def _blocks(lines: list[_Line]) -> list[Block]:
+    blocks: list[Block] = []
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -76,22 +54,22 @@ def _blocks(lines: list[_Line]) -> list[tuple[str, int, NormalizedText]]:
             i += 1
         elif line.stripped.startswith(_FENCE):
             end = _next(lines, i + 1, lambda line: line.stripped.startswith(_FENCE))
-            blocks.append(("code", 0, _verbatim(lines[i + 1 : end])))
+            blocks.append(Block("code", 0, _verbatim(lines[i + 1 : end])))
             i = end + 1
         elif heading := _HEADING.match(line.content):
             title = _shifted(normalize(heading.group(2)), line.start + heading.start(2))
-            blocks.append(("heading", len(heading.group(1)), title))
+            blocks.append(Block("heading", len(heading.group(1)), title))
             i += 1
         elif line.stripped.startswith("|"):
             end = _next(lines, i, lambda line: not line.stripped.startswith("|"))
-            blocks.append(("table", 0, _normalized(lines[i:end])))
+            blocks.append(Block("table", 0, _normalized(lines[i:end])))
             i = end
         elif _LIST_ITEM.match(line.content):
-            blocks.append(("list_item", 0, _normalized([line])))
+            blocks.append(Block("list_item", 0, _normalized([line])))
             i += 1
         else:
             end = _next(lines, i + 1, _starts_block)
-            blocks.append(("paragraph", 0, _normalized(lines[i:end])))
+            blocks.append(Block("paragraph", 0, _normalized(lines[i:end])))
             i = end
     return blocks
 

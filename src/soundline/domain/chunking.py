@@ -9,7 +9,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from soundline.domain.markdown import Element, ParsedDocument
+from soundline.domain.documents import Element, ParsedDocument
 from soundline.domain.quotes import Span
 
 type TokenCounter = Callable[[str], int]
