@@ -21,9 +21,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/soundline-dev/soundline"
-Documentation = "https://github.com/soundline-dev/soundline/tree/main/docs"
-Issues = "https://github.com/soundline-dev/soundline/issues"
+Homepage = "https://github.com/yamsdmc/soundline"
+Documentation = "https://github.com/yamsdmc/soundline/tree/main/docs"
+Issues = "https://github.com/yamsdmc/soundline/issues"
 
 [dependency-groups]
 dev = [

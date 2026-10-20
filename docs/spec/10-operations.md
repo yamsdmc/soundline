@@ -78,7 +78,7 @@
 
 > **Scope: later** (follows the HTTP server), except OPS-006 (performance targets), which applies from 0.1.
 
-- **OPS-001** A Docker image (`ghcr.io/soundline-dev/soundline`) runs the HTTP server, non-root, with a read-only root filesystem except for the data volume.
+- **OPS-001** A Docker image (`ghcr.io/yamsdmc/soundline`) runs the HTTP server, non-root, with a read-only root filesystem except for the data volume.
 - **OPS-002** Configuration of the container is entirely through environment variables and a mounted config file.
 - **OPS-003** `/health` and `/ready` support orchestrator probes. Graceful shutdown finishes in-flight requests within a configurable timeout.
 - **OPS-004** Ingestion jobs on the server run in a bounded worker pool. Job state survives restarts when backed by PostgreSQL. With SQLite, in-flight jobs are marked failed on restart and are safely re-runnable (idempotency, ING-007).

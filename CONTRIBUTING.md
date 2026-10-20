@@ -30,7 +30,7 @@ spec change (if behavior changes)
 ## Development setup
 
 ```bash
-git clone https://github.com/soundline-dev/soundline && cd soundline
+git clone https://github.com/yamsdmc/soundline && cd soundline
 uv sync
 uv run pytest                 # default suite: offline, < 60 s
 uv run pyright

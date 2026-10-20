@@ -16,7 +16,7 @@ Each milestone lists its scope, the spec IDs it covers, and its **definition of 
 
 **Goal:** a repository where writing the first test is frictionless.
 
-- GitHub organization `soundline-dev`, repository `soundline-dev/soundline`.
+- GitHub repository `yamsdmc/soundline`.
 - `pyproject.toml` (uv, hatchling), `src/` layout, Python 3.12+, `py.typed`.
 - ruff, pyright strict, pytest with plugins, Hypothesis profiles, `pytest-socket`.
 - `import-linter` contracts for ARC-001 to ARC-004 (initially trivially satisfied).

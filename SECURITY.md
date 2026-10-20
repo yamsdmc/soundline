@@ -8,7 +8,7 @@ Soundline is in its specification phase and has no release yet. Once released, s
 
 **Please do not open a public issue for a vulnerability.**
 
-Use GitHub's [private vulnerability reporting](https://github.com/soundline-dev/soundline/security/advisories/new) for this repository. You will receive an acknowledgment within 7 days.
+Use GitHub's [private vulnerability reporting](https://github.com/yamsdmc/soundline/security/advisories/new) for this repository. You will receive an acknowledgment within 7 days.
 
 Please include:
 
