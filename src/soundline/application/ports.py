@@ -33,6 +33,12 @@ class Embedder(Protocol):
     def embed_query(self, text: str) -> Vector: ...
 
 
+class Retriever(Protocol):
+    def search(self, text: str, limit: int) -> list[Chunk]:
+        """Most relevant chunks first."""
+        ...
+
+
 class LexicalIndex(Protocol):
     def add(self, chunk: Chunk) -> None: ...
 

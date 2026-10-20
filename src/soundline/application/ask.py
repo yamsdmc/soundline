@@ -1,7 +1,7 @@
 import json
 from collections.abc import Mapping, Sequence
 
-from soundline.application.ports import GenerationRequest, LanguageModel, LexicalIndex
+from soundline.application.ports import GenerationRequest, LanguageModel, Retriever
 from soundline.domain.answers import (
     AbstentionReason,
     Answer,
@@ -31,8 +31,8 @@ OUTPUT_FORMAT = (
 )
 
 
-def ask(question: str, index: LexicalIndex, llm: LanguageModel, k: int = 5) -> Answer:
-    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(index.search(question, k), 1)}
+def ask(question: str, retriever: Retriever, llm: LanguageModel, k: int = 5) -> Answer:
+    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(retriever.search(question, k), 1)}
     if not evidence:
         return Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
 
