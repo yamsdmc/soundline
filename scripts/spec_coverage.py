@@ -1,6 +1,8 @@
 """Traceability between spec behaviors (docs/spec) and the tests that cover them.
 
-Usage: python scripts/spec_coverage.py [SPEC_DIR] [TESTS_DIR]
+Usage: python scripts/spec_coverage.py [SPEC_DIR] [TEST_DIR ...]
+
+Test directories default to tests/ and src/soundline/testing/ (public contract suites).
 
 Exits with 1 when a test references a behavior ID that the spec does not define.
 Uncovered behaviors are reported but do not fail: the spec describes the destination.
@@ -73,10 +75,14 @@ def coverage_report(spec_markdowns: Iterable[str], test_sources: Iterable[str]) 
 
 def main(argv: list[str]) -> int:
     spec_dir = Path(argv[0]) if argv else Path("docs/spec")
-    tests_dir = Path(argv[1]) if len(argv) > 1 else Path("tests")
+    test_dirs = [Path(arg) for arg in argv[1:]] or [Path("tests"), Path("src/soundline/testing")]
     report = coverage_report(
         (path.read_text(encoding="utf-8") for path in sorted(spec_dir.glob("*.md"))),
-        (path.read_text(encoding="utf-8") for path in sorted(tests_dir.rglob("*.py"))),
+        (
+            path.read_text(encoding="utf-8")
+            for test_dir in test_dirs
+            for path in sorted(test_dir.rglob("*.py"))
+        ),
     )
     mandatory = len(report.covered) + len(report.uncovered)
     print(f"covered:  {len(report.covered)}/{mandatory} mandatory behaviors")

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from spec_coverage import (
     coverage_report,
     defined_behaviors,
@@ -96,3 +98,17 @@ def test_cli_fails_only_when_a_test_references_an_unknown_behavior(tmp_path: Pat
 
     test_file.write_text('@pytest.mark.spec("ING-999")\ndef test_x(): ...\n')
     assert main([str(spec_dir), str(tests_dir)]) == 1
+
+
+def test_cli_reads_spec_markers_from_every_given_test_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    spec_dir, tests_dir, contracts_dir = tmp_path / "spec", tmp_path / "tests", tmp_path / "lib"
+    for directory in (spec_dir, tests_dir, contracts_dir):
+        directory.mkdir()
+    (spec_dir / "03-ingestion.md").write_text(SPEC)
+    (contracts_dir / "contracts.py").write_text('@pytest.mark.spec("ING-002")\ndef test_y(): ...\n')
+
+    main([str(spec_dir), str(tests_dir), str(contracts_dir)])
+
+    assert "covered:  1/2" in capsys.readouterr().out

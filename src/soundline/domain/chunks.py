@@ -1,4 +1,6 @@
+import hashlib
 from dataclasses import dataclass
+from functools import cached_property
 
 from soundline.domain.quotes import Span
 
@@ -10,3 +12,9 @@ class Chunk:
     source: str
     text: str
     span: Span
+
+    @cached_property
+    def id(self) -> str:
+        """Deterministic: same source, span and text, same ID (ING-010)."""
+        key = f"{self.source}\0{self.span.start}\0{self.span.end}\0{self.text}"
+        return hashlib.sha256(key.encode()).hexdigest()[:16]
