@@ -22,6 +22,7 @@ This confirms the risk on a real developer machine. It concerns a 3.10 build, be
 - Otherwise fall back to **`sqlean.py`**, which ships its own SQLite with extension loading and FTS5 and exposes the same DB-API as `sqlite3`. The adapter code is therefore identical for both.
 - `sqlean.py` becomes a core dependency when the SQLite adapter lands (M2), so that the fallback needs no user action.
 - `soundline doctor` reports which binding is in use.
+- **The binding is chosen once per process and never mixed.** Found during M2: sqlite-vec keeps a global pointer to the SQLite API that loaded it. Loading it into a second, different SQLite library (stdlib *and* sqlean in one process) aborts the process (`SIGABRT`, exit code 134) when a connection of the first library is finalized. Reproduced with a ten-line script; guarded by `test_every_database_of_a_process_uses_the_same_sqlite_binding`. Binding selection (`choose_binding`) is a pure check that never loads the extension, so it can be tested in-process.
 
 ## Consequences
 

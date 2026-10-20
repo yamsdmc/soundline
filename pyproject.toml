@@ -19,6 +19,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "fastembed>=0.7",
     "sqlean-py>=3.47",
     "sqlite-vec>=0.1.6",
 ]
@@ -52,12 +53,16 @@ packages = ["src/soundline"]
 minversion = "8.3"
 testpaths = ["tests"]
 pythonpath = ["scripts"]
-addopts = ["--strict-markers", "--strict-config", "--disable-socket", "--allow-unix-socket", "-ra"]
+addopts = [
+    "--strict-markers", "--strict-config", "--disable-socket", "--allow-unix-socket", "-ra",
+    "-m", "not live and not models",
+]
 xfail_strict = true
 markers = [
     "spec(*ids): behavior IDs from docs/spec covered by this test",
     "slow: takes more than one second",
-    "live: calls real external providers (opt-in)",
+    "live: calls real external providers (opt-in: -m live --force-enable-socket)",
+    "models: downloads and runs real local models (opt-in: -m models --force-enable-socket)",
 ]
 
 # --- Lint & format -----------------------------------------------------------

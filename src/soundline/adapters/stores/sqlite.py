@@ -1,6 +1,7 @@
 import re
 import sqlite3
 from collections.abc import Sequence
+from functools import cache
 from types import ModuleType
 from typing import Any
 
@@ -13,22 +14,35 @@ from soundline.domain.quotes import Span
 _TERM = re.compile(r"\w+")
 
 
-def open_database(
-    path: str, bindings: Sequence[ModuleType | Any] = (sqlite3, sqlean)
-) -> sqlite3.Connection:
-    """Opens a SQLite database with sqlite-vec loaded (ARC-014, ADR 0012).
+def choose_binding(bindings: Sequence[ModuleType | Any]) -> ModuleType | Any:
+    """The first binding able to load extensions (ARC-014, ADR 0012).
 
-    Some Python builds compile `sqlite3` without extension loading; the next binding
-    (`sqlean.py`, same DB-API) is then used.
+    Some Python builds compile `sqlite3` without extension loading; `sqlean.py`
+    (its own SQLite, same DB-API) is then used.
     """
     for binding in bindings:
-        connection = binding.connect(path)
-        if hasattr(connection, "enable_load_extension"):
-            connection.enable_load_extension(True)
-            sqlite_vec.load(connection)
-            connection.enable_load_extension(False)
-            return connection
+        probe = binding.connect(":memory:")
+        capable = hasattr(probe, "enable_load_extension")
+        probe.close()
+        if capable:
+            return binding
     raise RuntimeError("no SQLite binding on this Python can load extensions")
+
+
+@cache
+def _process_binding() -> ModuleType | Any:
+    # Chosen once per process: sqlite-vec keeps a global pointer to the SQLite API that
+    # loaded it, so loading it into two different SQLite libraries aborts the process.
+    return choose_binding((sqlite3, sqlean))
+
+
+def open_database(path: str) -> sqlite3.Connection:
+    """Opens a SQLite database with sqlite-vec loaded."""
+    connection = _process_binding().connect(path)
+    connection.enable_load_extension(True)
+    sqlite_vec.load(connection)
+    connection.enable_load_extension(False)
+    return connection
 
 
 class SqliteLexicalIndex:
