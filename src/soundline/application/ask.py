@@ -1,11 +1,10 @@
 """Grounded answers (docs/spec/05-generation.md): the model proposes, the code verifies."""
 
-import json
-import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import cast
 
+from soundline.application.model_output import InvalidOutputError, parse_json_object
 from soundline.application.ports import GenerationRequest, LanguageModel, Retriever
 from soundline.application.prompts import (
     CONDENSE_PROMPT,
@@ -35,12 +34,6 @@ from soundline.domain.events import (
 )
 from soundline.domain.usage import Price, StageUsage, Usage, price_for
 from soundline.domain.verification import Method, verify_quote
-
-_FENCED = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
-
-
-class _InvalidOutputError(Exception):
-    """The model's output does not follow the expected format; the message says why."""
 
 
 @dataclass(frozen=True)
@@ -146,12 +139,12 @@ def _condensed(
     """The follow-up as a standalone query; the question itself if that fails (RET-073)."""
     request = condense_request(settings.condense_prompt, question, history)
     try:
-        data, _ = _json_object(calls.generate("rewrite", request))
+        data, _ = parse_json_object(calls.generate("rewrite", request))
         query = data.get("query")
         if isinstance(query, str) and query.strip():
             return query.strip()
         reason = "no query in the output"
-    except (_InvalidOutputError, GenerationError, ProviderUnavailableError) as error:
+    except (InvalidOutputError, GenerationError, ProviderUnavailableError) as error:
         reason = str(error)
     warnings.append(f"follow-up condensation failed ({reason}); searched the question as asked")
     return question
@@ -203,7 +196,7 @@ def _generate(calls: _Calls, request: GenerationRequest) -> _ModelOutput:
     """One corrective retry with the validation error, then a GenerationError (GEN-020)."""
     try:
         return _parse(calls.generate("generation", request))
-    except _InvalidOutputError as first:
+    except InvalidOutputError as first:
         retry = GenerationRequest(
             request.system,
             f"{request.prompt}\n\nYour previous output was invalid: {first}. "
@@ -212,50 +205,27 @@ def _generate(calls: _Calls, request: GenerationRequest) -> _ModelOutput:
         )
         try:
             return _parse(calls.generate("generation_retry", retry))
-        except _InvalidOutputError as second:
+        except InvalidOutputError as second:
             raise GenerationError(
                 f"the model did not follow the output format twice: {second}"
             ) from second
 
 
-def _json_object(raw: str) -> tuple[Mapping[str, object], bool]:
-    """Strict JSON first; then lenient: JSON in a Markdown fence or amid prose (GEN-023).
-    The flag says whether leniency was needed."""
-    lenient = False
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        lenient = True
-        data = _lenient_json(raw)
-    if not isinstance(data, Mapping):
-        raise _InvalidOutputError("the output must be a JSON object")
-    return cast("Mapping[str, object]", data), lenient
-
-
 def _parse(raw: str) -> _ModelOutput:
-    output, lenient = _json_object(raw)
+    output, lenient = parse_json_object(raw)
     claims = output.get("claims")
     # Claims win over the declaration: small models often fill it with "" while answering,
     # and the claims are verified anyway (GEN-021, GEN-023).
     if isinstance(output.get("insufficient_evidence"), str) and not claims:
         return _ModelOutput([], str(output["insufficient_evidence"]), lenient)
     if not isinstance(claims, list):
-        raise _InvalidOutputError("'claims' must be a list of claims")
+        raise InvalidOutputError("'claims' must be a list of claims")
     return _ModelOutput([_claim(c) for c in cast("list[object]", claims)], None, lenient)
-
-
-def _lenient_json(raw: str) -> object:
-    fenced = _FENCED.search(raw)
-    candidate = fenced.group(1) if fenced else raw[raw.find("{") : raw.rfind("}") + 1]
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError as error:
-        raise _InvalidOutputError(f"no JSON object found ({error.msg})") from error
 
 
 def _claim(item: object) -> _ModelClaim:
     if not isinstance(item, Mapping):
-        raise _InvalidOutputError("each claim must be an object")
+        raise InvalidOutputError("each claim must be an object")
     claim = cast("Mapping[str, object]", item)
     citations: list[tuple[str, str]] = []
     for citation in cast("list[object]", claim.get("citations") or []):
