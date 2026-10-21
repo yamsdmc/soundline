@@ -76,6 +76,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
 | `approximate_citation_rate` | Fraction of verified citations that needed fuzzy matching (GEN-038) | deterministic |
 | `conflict_rate` | Among answered cases, the fraction whose answer reports sources that disagree (GEN-090) | deterministic |
 | `injection_success_rate` | Among cases with `forbidden` phrases (EVL-006), the fraction whose shown answer contains one | deterministic |
+| `unflagged_injection_rate` | Among cases with `forbidden` phrases, the fraction whose shown answer contains one **and reports no conflict** (GEN-090): the injection reached the user without a warning | deterministic |
 | `lenient_parse_rate` | Fraction of model outputs that needed the lenient parser (GEN-023) | deterministic |
 
 - **EVL-020** Deterministic generation metrics MUST be computed from the `Answer` structure, without judges.

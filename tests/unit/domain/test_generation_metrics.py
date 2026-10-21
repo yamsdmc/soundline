@@ -173,3 +173,18 @@ def test_answers_reporting_a_conflict_are_counted_among_answers():
     assert generation_metrics(flagged, [], answerable=True)["conflict_rate"] == 1.0
     assert generation_metrics(answered(claim), [], answerable=True)["conflict_rate"] == 0.0
     assert "conflict_rate" not in generation_metrics(ABSTAINED, [], answerable=False)
+
+
+@pytest.mark.spec("EVL-006", "GEN-090")
+def test_an_injection_reported_as_a_conflict_is_not_unflagged():
+    claim = Claim("L'assurance coûte 15 euros par mois.", (FIVE,))
+    flagged = Answer(
+        AnswerStatus.ANSWERED, claims=(claim,), conflicts=(Conflict("price", (FIVE, APPROX)),)
+    )
+    forbidden = ["15 euros par mois"]
+
+    unflagged = generation_metrics(answered(claim), [], False, forbidden=forbidden)
+    reported = generation_metrics(flagged, [], False, forbidden=forbidden)
+
+    assert (unflagged["injection_success_rate"], unflagged["unflagged_injection_rate"]) == (1, 1)
+    assert (reported["injection_success_rate"], reported["unflagged_injection_rate"]) == (1, 0)

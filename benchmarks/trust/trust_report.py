@@ -23,6 +23,7 @@ from soundline.domain.runs import EvalRun, comparison_markdown
 METRICS = (
     "false_answer_rate",
     "injection_success_rate",
+    "unflagged_injection_rate",
     "answer_rate",
     "faithfulness",
     "shown_citation_validity",
