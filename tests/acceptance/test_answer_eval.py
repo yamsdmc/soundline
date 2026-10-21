@@ -111,3 +111,49 @@ def test_no_cache_forces_fresh_model_calls(dataset: Path):
     soundline.evaluate(dataset, no_cache=True)
 
     assert len(llm.requests) == 4
+
+
+@pytest.mark.spec("EVL-021", "EVL-041", "EVL-043")
+def test_a_judge_scores_faithfulness_and_the_run_keeps_its_verdicts(dataset: Path):
+    soundline = Soundline.in_memory(llm=scripted())
+    soundline.ingest_text("lease.md", LEASE)
+    judge = ScriptedLanguageModel(
+        {"rationale": "The quote states it.", "entailed": True}, model_id="anthropic:judge"
+    )
+
+    run = soundline.evaluate(dataset, judge=judge)
+
+    assert run.per_case["rent-due"]["faithfulness"] == 1.0
+    assert "faithfulness" not in run.per_case["parking"]  # no claim to judge
+    assert run.settings["judge"] == {
+        "model": "anthropic:judge",
+        "version": "faithfulness-v1",
+        "calibration": "uncalibrated",
+    }
+    verdicts = run.answers["rent-due"]["judgments"]
+    assert verdicts == [
+        {"claim": "Rent is due on the 5th.", "entailed": True, "rationale": "The quote states it."}
+    ]
+    assert run.answers["parking"]["status"] == "abstained"
+
+
+@pytest.mark.spec("EVL-042")
+def test_judging_with_the_generator_model_is_flagged(dataset: Path):
+    soundline = Soundline.in_memory(llm=scripted())
+    soundline.ingest_text("lease.md", LEASE)
+    judge = ScriptedLanguageModel({"rationale": "ok", "entailed": True}, model_id="ollama:test")
+
+    run = soundline.evaluate(dataset, judge=judge)
+
+    assert any("same model" in warning for warning in run.warnings)
+
+
+@pytest.mark.spec("EVL-040")
+def test_an_unreadable_verdict_leaves_the_case_unjudged_with_a_warning(dataset: Path):
+    soundline = Soundline.in_memory(llm=scripted())
+    soundline.ingest_text("lease.md", LEASE)
+
+    run = soundline.evaluate(dataset, judge=ScriptedLanguageModel("not a verdict"))
+
+    assert "faithfulness" not in run.per_case["rent-due"]
+    assert any("1 unreadable" in warning for warning in run.warnings)

@@ -3,10 +3,10 @@
 import json
 import os
 import sys
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
-from typing import Annotated, NoReturn
+from typing import Annotated, NoReturn, cast
 
 import typer
 
@@ -270,6 +270,10 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
     no_cache: Annotated[
         bool, typer.Option(help="Call the model again instead of reusing cached outputs.")
     ] = False,
+    judge: Annotated[
+        str | None,
+        typer.Option(help="Judge model for faithfulness, e.g. anthropic:claude-opus-5-5."),
+    ] = None,
     as_json: JsonOption = False,
 ) -> None:
     with _soundline() as soundline:
@@ -279,6 +283,7 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
             allow_missing_sources=allow_missing_sources,
             retrieval_only=retrieval_only,
             no_cache=no_cache,
+            judge=llm_from_spec(judge) if judge else None,
         )
     if as_json:
         typer.echo(json.dumps(run.to_dict()))
@@ -286,6 +291,12 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
     mode = run.settings.get("mode")
     model = f", model {run.settings['model']}" if "model" in run.settings else ""
     typer.echo(f"run {run.name} ({mode}{model}): {run.dataset['cases']} cases")
+    judged = run.settings.get("judge")
+    if isinstance(judged, Mapping):
+        info = cast("Mapping[str, object]", judged)
+        typer.echo(f"judge {info['model']} ({info['version']}, {info['calibration']})")
+    for warning in run.warnings:
+        typer.echo(f"warning: {warning}")
     typer.echo("metrics, 95% bootstrap intervals over the cases that define them:")
     width = max((len(metric) for metric in run.metrics), default=0)
     for metric, estimate in run.metrics.items():

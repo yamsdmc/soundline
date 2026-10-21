@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 
+from soundline.application.judges import FaithfulnessJudge
 from soundline.application.ports import DocumentStore, Index
-from soundline.domain.answers import Answer
+from soundline.domain.answers import Answer, answer_to_dict
 from soundline.domain.datasets import Dataset, DatasetError, RelevantQuote, parse_dataset
 from soundline.domain.evaluation import Located, generation_metrics, retrieval_metrics
 from soundline.domain.hits import Hit
@@ -98,9 +99,18 @@ class Generator:
     answer: Callable[[str], Answer]
     settings: Mapping[str, object]
     """Recorded in the run: model ID, prompt version (EVL-060)."""
+    judge: FaithfulnessJudge | None = None
+    """Optional, enabled explicitly (EVL-021)."""
 
 
-_OPERATIONS = ("latency_ms", "tokens_in", "tokens_out", "cost_usd")
+_OPERATIONS = (
+    "latency_ms",
+    "tokens_in",
+    "tokens_out",
+    "cost_usd",
+    "judge_tokens_in",
+    "judge_tokens_out",
+)
 
 
 def run_eval(  # noqa: PLR0913  # keyword-only collaborators
@@ -121,6 +131,8 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
         dataset, index.documents, allow_missing_sources=settings.allow_missing_sources
     )
     per_case: dict[str, dict[str, float]] = {}
+    answers: dict[str, dict[str, object]] = {}
+    unreadable = 0
     for case in dataset.cases:
         metrics: dict[str, float] = {}
         if case.answerable:  # retrieval metrics need relevant quotes (EVL-003)
@@ -133,10 +145,23 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             latency_ms = (clock() - started) * 1000
             metrics.update(generation_metrics(answer, quotes.get(case.id, []), case.answerable))
             metrics.update(_operational(answer, latency_ms))
+            answers[case.id] = answer_to_dict(answer)
+            if generator.judge is not None:
+                judged, failed = _judged(generator.judge, answer, metrics)
+                answers[case.id]["judgments"] = judged
+                unreadable += failed
         if metrics:
             per_case[case.id] = metrics
     manifest = index.manifest.load()
-    mode = {"mode": "end-to-end", **generator.settings} if generator else {"mode": "retrieval-only"}
+    mode: dict[str, object] = {"mode": "retrieval-only"}
+    if generator is not None:
+        mode = {"mode": "end-to-end", **generator.settings}
+        if generator.judge is not None:
+            mode["judge"] = {
+                "model": generator.judge.model_id,
+                "version": generator.judge.version,
+                "calibration": "uncalibrated",  # EVL-043: until `eval calibrate` exists
+            }
     return EvalRun(
         name=name,
         created_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -152,12 +177,51 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
         settings={"ks": list(settings.ks), **mode},
         per_case=per_case,
         metrics=aggregate(per_case),
+        warnings=_judge_warnings(generator, unreadable),
+        answers=answers,
         operations={
             metric: describe([m[metric] for m in per_case.values() if metric in m])
             for metric in _OPERATIONS
             if any(metric in m for m in per_case.values())
         },
     )
+
+
+def _judged(
+    judge: FaithfulnessJudge, answer: Answer, metrics: dict[str, float]
+) -> tuple[list[dict[str, object]], int]:
+    """Faithfulness of the case: entailed claims among those with a readable verdict
+    (EVL-041). Returns the verdicts and the number of unreadable ones."""
+    verdicts: list[dict[str, object]] = []
+    failed = 0
+    before = judge.usage
+    for claim in answer.claims:
+        judgment = judge.judge(claim)
+        if judgment is None:
+            failed += 1
+            continue
+        verdicts.append(
+            {"claim": claim.text, "entailed": judgment.entailed, "rationale": judgment.rationale}
+        )
+    if verdicts:
+        metrics["faithfulness"] = sum(bool(v["entailed"]) for v in verdicts) / len(verdicts)
+    spent = judge.usage - before
+    metrics["judge_tokens_in"] = float(spent.total_input)
+    metrics["judge_tokens_out"] = float(spent.output)
+    return verdicts, failed
+
+
+def _judge_warnings(generator: Generator | None, unreadable: int) -> list[str]:
+    if generator is None or generator.judge is None:
+        return []
+    warnings: list[str] = []
+    if generator.judge.model_id == generator.settings.get("model"):
+        warnings.append(
+            "the judge is the same model as the generator: prefer another family (EVL-042)"
+        )
+    if unreadable:
+        warnings.append(f"{unreadable} unreadable judge verdicts: those claims are unjudged")
+    return warnings
 
 
 def _operational(answer: Answer, latency_ms: float) -> dict[str, float]:

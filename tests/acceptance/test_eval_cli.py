@@ -198,3 +198,43 @@ def test_retrieval_only_skips_the_configured_language_model(
     assert result.exit_code == 0, result.output
     assert "retrieval-only" in result.stdout
     assert model.requests == []
+
+
+@pytest.mark.spec("EVL-021")
+def test_a_judge_model_is_enabled_explicitly_on_the_command_line(
+    tmp_path: Path, corpus: Path, dataset: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run = runner_for(tmp_path / "home", monkeypatch)
+    run("ingest", str(corpus))
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:generator")
+    models = {"scripted:generator": abstaining_model(), "scripted:judge": ScriptedLanguageModel()}
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return models[spec]
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+
+    result = run("eval", "run", str(dataset), "--judge", "scripted:judge", "--json")
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["settings"]["judge"]["version"] == "faithfulness-v1"
+
+
+@pytest.mark.spec("EVL-042", "EVL-043")
+def test_the_report_names_the_judge_its_calibration_and_the_warnings(
+    tmp_path: Path, corpus: Path, dataset: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run = runner_for(tmp_path / "home", monkeypatch)
+    run("ingest", str(corpus))
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:same")
+    models = {"scripted:same": abstaining_model()}
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return models.get(spec) or ScriptedLanguageModel(model_id="scripted:test")
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+
+    result = run("eval", "run", str(dataset), "--judge", "scripted:same")
+
+    assert "judge scripted:test (faithfulness-v1, uncalibrated)" in result.stdout
+    assert "warning: the judge is the same model" in result.stdout

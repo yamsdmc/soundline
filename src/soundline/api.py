@@ -14,6 +14,7 @@ from soundline.application.evaluate import DatasetFile, EvalSettings, Generator,
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
 from soundline.application.ingest_sources import ingest_sources
+from soundline.application.judges import FaithfulnessJudge
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import (
     Embedder,
@@ -225,11 +226,12 @@ class Soundline:
         allow_missing_sources: bool = False,
         retrieval_only: bool = False,
         no_cache: bool = False,
+        judge: LanguageModel | None = None,
     ) -> EvalRun:
         """Evaluates a JSONL dataset and stores the run (EVL-060): end to end when a language
         model is configured, retrieval-only otherwise or on request (EVL-062). Model calls
         are cached by input, so a rerun is reproducible and free; `no_cache` forces fresh
-        calls (EVL-061)."""
+        calls (EVL-061). A `judge` model adds faithfulness, claim by claim (EVL-021)."""
         check_pipeline(self._index.manifest, self._manifest)
         if not Path(dataset).is_file():
             raise DatasetError(f"dataset file not found: {dataset}")
@@ -238,6 +240,8 @@ class Soundline:
             llm = self._llm
             if not no_cache:
                 llm = CachedLanguageModel(llm, self._generation_cache)
+                if judge is not None:
+                    judge = CachedLanguageModel(judge, self._generation_cache)
             generator = Generator(
                 lambda question: ask(question, self._retriever, llm, self._generation),
                 {
@@ -245,6 +249,7 @@ class Soundline:
                     "prompt_version": self._generation.prompt.version,
                     "k": self._generation.k,
                 },
+                FaithfulnessJudge(judge) if judge else None,
             )
         run = run_eval(
             name or datetime.now(UTC).strftime("run-%Y%m%d-%H%M%S"),
