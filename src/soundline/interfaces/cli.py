@@ -252,8 +252,12 @@ def _usage_line(usage: Usage) -> str:
     return f"{line}, cost unknown: no price for {', '.join(unpriced)}"
 
 
-@eval_app.command("run", help="Evaluate retrieval on a JSONL dataset and store the run.")
-def eval_run(
+@eval_app.command(
+    "run",
+    help="Evaluate a JSONL dataset and store the run: end to end with a language model,"
+    " retrieval-only without one.",
+)
+def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
     dataset: Path,
     name: Annotated[str | None, typer.Option(help="Run name (default: a timestamp).")] = None,
     allow_missing_sources: Annotated[
@@ -263,6 +267,9 @@ def eval_run(
     retrieval_only: Annotated[
         bool, typer.Option(help="Search only; never call the language model (EVL-062).")
     ] = False,
+    no_cache: Annotated[
+        bool, typer.Option(help="Call the model again instead of reusing cached outputs.")
+    ] = False,
     as_json: JsonOption = False,
 ) -> None:
     with _soundline() as soundline:
@@ -271,6 +278,7 @@ def eval_run(
             name,
             allow_missing_sources=allow_missing_sources,
             retrieval_only=retrieval_only,
+            no_cache=no_cache,
         )
     if as_json:
         typer.echo(json.dumps(run.to_dict()))

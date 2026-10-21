@@ -8,13 +8,21 @@ from types import TracebackType
 from typing import Self
 
 from soundline.application.ask import GenerationSettings, ask, ask_stream
+from soundline.application.cached_model import CachedLanguageModel
 from soundline.application.diagnostics import Check, diagnose
 from soundline.application.evaluate import DatasetFile, EvalSettings, Generator, run_eval
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
 from soundline.application.ingest_sources import ingest_sources
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
-from soundline.application.ports import Embedder, Index, LanguageModel, RunStore, SourceReader
+from soundline.application.ports import (
+    Embedder,
+    GenerationCache,
+    Index,
+    LanguageModel,
+    RunStore,
+    SourceReader,
+)
 from soundline.domain.answers import Answer, history_text
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.conversation import Turn
@@ -28,6 +36,7 @@ from soundline.domain.runs import EvalRun
 from soundline.testing import (
     HashingEmbedder,
     InMemoryDocumentStore,
+    InMemoryGenerationCache,
     InMemoryIndex,
     InMemoryManifestStore,
     InMemoryRunStore,
@@ -46,6 +55,7 @@ class Soundline:
         reader: SourceReader | None = None,
         runs: RunStore | None = None,
         generation: GenerationSettings | None = None,
+        generation_cache: GenerationCache | None = None,
     ) -> None:
         chunking = chunking or ChunkingSettings()
         self._index = index
@@ -58,6 +68,7 @@ class Soundline:
         self._reader = reader or _local_files()
         self._runs = runs or InMemoryRunStore()
         self._generation = generation or GenerationSettings()
+        self._generation_cache = generation_cache or InMemoryGenerationCache()  # EVL-061
 
     @classmethod
     def open(
@@ -91,10 +102,22 @@ class Soundline:
             close=database.close,
             describe=lambda: describe_database(database),
         )
-        from soundline.adapters.evals.json_files import JsonRunStore  # noqa: PLC0415
+        from soundline.adapters.evals.json_files import (  # noqa: PLC0415
+            JsonGenerationCache,
+            JsonRunStore,
+        )
 
         runs = JsonRunStore(Path(home) / "evals" / "runs")
-        return cls(index, embedder, llm, chunking, runs=runs, generation=generation)
+        cache = JsonGenerationCache(Path(home) / "cache" / "generations")
+        return cls(
+            index,
+            embedder,
+            llm,
+            chunking,
+            runs=runs,
+            generation=generation,
+            generation_cache=cache,
+        )
 
     def __enter__(self) -> Self:
         return self
@@ -201,16 +224,22 @@ class Soundline:
         *,
         allow_missing_sources: bool = False,
         retrieval_only: bool = False,
+        no_cache: bool = False,
     ) -> EvalRun:
         """Evaluates a JSONL dataset and stores the run (EVL-060): end to end when a language
-        model is configured, retrieval-only otherwise or on request (EVL-062)."""
+        model is configured, retrieval-only otherwise or on request (EVL-062). Model calls
+        are cached by input, so a rerun is reproducible and free; `no_cache` forces fresh
+        calls (EVL-061)."""
         check_pipeline(self._index.manifest, self._manifest)
         if not Path(dataset).is_file():
             raise DatasetError(f"dataset file not found: {dataset}")
         generator = None
         if self._llm is not None and not retrieval_only:
+            llm = self._llm
+            if not no_cache:
+                llm = CachedLanguageModel(llm, self._generation_cache)
             generator = Generator(
-                self.ask,
+                lambda question: ask(question, self._retriever, llm, self._generation),
                 {
                     "model": self._llm.model_id,
                     "prompt_version": self._generation.prompt.version,

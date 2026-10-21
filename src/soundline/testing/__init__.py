@@ -2,6 +2,7 @@
 
 from soundline.testing.hashing_embedder import HashingEmbedder
 from soundline.testing.in_memory_document_store import InMemoryDocumentStore
+from soundline.testing.in_memory_generation_cache import InMemoryGenerationCache
 from soundline.testing.in_memory_index import InMemoryIndex
 from soundline.testing.in_memory_manifest_store import InMemoryManifestStore
 from soundline.testing.in_memory_run_store import InMemoryRunStore
@@ -11,6 +12,7 @@ from soundline.testing.scripted_language_model import ScriptedLanguageModel
 __all__ = [
     "HashingEmbedder",
     "InMemoryDocumentStore",
+    "InMemoryGenerationCache",
     "InMemoryIndex",
     "InMemoryManifestStore",
     "InMemoryRunStore",

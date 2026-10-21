@@ -66,6 +66,14 @@ class LanguageModel(Protocol):
     def generate(self, request: GenerationRequest) -> Generation: ...
 
 
+class GenerationCache(Protocol):
+    """Model outputs by request key, so evaluation runs are reproducible (EVL-061)."""
+
+    def get(self, key: str) -> Generation | None: ...
+
+    def put(self, key: str, generation: Generation) -> None: ...
+
+
 type Vector = tuple[float, ...]
 
 

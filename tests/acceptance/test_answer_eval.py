@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -76,3 +77,37 @@ def test_a_retrieval_only_run_never_calls_the_model(dataset: Path):
     assert run.settings["mode"] == "retrieval-only"
     assert llm.requests == []
     assert "parking" not in run.per_case
+
+
+def without_latency(run_cases: Mapping[str, Mapping[str, float]]) -> dict[str, dict[str, float]]:
+    return {
+        case: {k: v for k, v in metrics.items() if k != "latency_ms"}
+        for case, metrics in run_cases.items()
+    }
+
+
+@pytest.mark.spec("EVL-061")
+def test_rerunning_with_a_warm_cache_reproduces_the_run_at_zero_model_cost(dataset: Path):
+    llm = scripted()  # two scripted answers: a third model call would fail the test
+    soundline = Soundline.in_memory(llm=llm)
+    soundline.ingest_text("lease.md", LEASE)
+
+    first = soundline.evaluate(dataset, "first")
+    second = soundline.evaluate(dataset, "second")
+
+    assert len(llm.requests) == 2
+    assert without_latency(second.per_case) == without_latency(first.per_case)
+
+
+@pytest.mark.spec("EVL-061")
+def test_no_cache_forces_fresh_model_calls(dataset: Path):
+    first, second = scripted(), scripted()
+    responses = [*first._responses, *second._responses]  # pyright: ignore[reportPrivateUsage]
+    llm = ScriptedLanguageModel(*responses, model_id="ollama:test")
+    soundline = Soundline.in_memory(llm=llm)
+    soundline.ingest_text("lease.md", LEASE)
+
+    soundline.evaluate(dataset)
+    soundline.evaluate(dataset, no_cache=True)
+
+    assert len(llm.requests) == 4
