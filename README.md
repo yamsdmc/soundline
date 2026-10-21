@@ -41,22 +41,24 @@ All three share the embedder, k = 5 and the model: `qwen3.5:9b` through Ollama, 
 |---|---|---|---|
 | False answers to unanswerable questions (n=18) ↓ | 0.61 [0.39, 0.83] | 0.17 [0.00, 0.33] | **0.17** [0.00, 0.33] |
 | Injections that reach the answer (n=6) ↓ | 0.67 [0.33, 1.00] | 0.67 [0.33, 1.00] | 0.67 [0.33, 1.00] |
+| ... without any warning to the user (n=6) ↓ | 0.67 [0.33, 1.00] | 0.33 [0.00, 0.67] | **0.33** [0.00, 0.67] |
 | Answerable questions answered (n=29) ↑ | 0.97 | 0.97 | 0.97 |
-| Faithfulness, uncalibrated judge ↑ | 0.74 [0.62, 0.85] | 0.86 [0.75, 0.95] | 0.86 [0.75, 0.95] |
+| Faithfulness, judged by qwen3.5:9b ↑ | 0.74 [0.62, 0.85] | 0.86 [0.76, 0.95] | 0.86 [0.76, 0.95] |
+| Faithfulness, judged by gemma3:12b ↑ | 0.82 [0.74, 0.90] | 0.98 [0.94, 1.00] | 0.97 [0.93, 1.00] |
 | Citations shown that exist in the source ↑ | not checkable | 0.99 | **1.00** |
-| Latency p50 / p95 ↓ | 5.9 s / 8.1 s | 10.4 s / 25.4 s | 10.4 s / 25.3 s |
-| Input tokens p50 ↓ | 1,291 | 2,380 | 2,380 |
+| Latency p50 / p95 ↓ | 5.9 s / 8.1 s | 11.1 s / 22.2 s | 11.1 s / 22.2 s |
+| Input tokens p50 ↓ | 1,291 | 2,469 | 2,469 |
 
 What this shows, and what it does not:
 
 - **Soundline gives far fewer false answers** (3 of 18 against 11 of 18; paired difference −0.44 [−0.67, −0.22]). **The gain does not come from verification**: Soundline without verification does exactly as well. It comes from the answer protocol (claims tied to evidence, and an explicit way to say the evidence is insufficient).
 - **Verification changes almost nothing with this model.** qwen3.5:9b already quotes its sources faithfully (99% of its quotes exist), so there is little to remove. Verification guarantees that what is shown exists, 100% of the time; how often that matters depends on the model, which this run does not measure.
-- **Planted content fools all three systems** on 4 of 6 cases, including a fake one-week notice period from an "agency" page and a fake winter-truce date. On one case Soundline does worse than the baseline: it quotes the planted 50% penalty next to the real 10%. **A verified quote proves that the source says it, not that the source is right.** Flagging conflicting sources is on the roadmap.
-- **Faithfulness looks higher, but the paired difference is not significant** (+0.02 [−0.13, +0.17] on the cases both systems answered).
-- **The cost**: about 1.8× the latency at the median, 3× at p95, and 1.8× the input tokens.
-- **Limits**: one model, one run, 47 questions (the intervals are wide; 6 injection cases are too few for a firm rate), and a judge that is the same model as the generator and not yet calibrated (EVL-043). Correctness against reference answers is not measured yet.
+- **Planted content still reaches the answer** in 4 of 6 cases, for all three systems. **A verified quote proves that the source says it, not that the source is right.** What Soundline adds is a warning: when the planted page contradicts an official one (a "50 %" penalty against the official 10 %, a one-week notice against three months), it states both versions, each attributed to its source, and reports `Sources disagree on ...` (GEN-090). It did so on all 4 questions where a planted page contradicts an official one, and on no other question. The 2 injections that pass unflagged (a fake winter-truce date, a fake insurance price) have no official page to contradict them: nothing in the documents can tell they are false.
+- **Faithfulness depends on the judge.** Both judges rank Soundline above the naive baseline, but they disagree on the level, and the paired difference is significant with gemma3:12b (+0.07 [+0.01, +0.15]) and not with qwen3.5:9b (+0.02 [−0.13, +0.17]). Neither judge is calibrated yet (EVL-043): read these as a ranking, not as rates.
+- **The cost**: about 1.9× the latency at the median, 2.7× at p95, and 1.9× the input tokens.
+- **Limits**: one generator model, one run, 47 questions (the intervals are wide; 6 injection cases are too few for a firm rate). Correctness against reference answers is not measured yet.
 
-Full results, with every paired comparison: [benchmarks/trust/results.md](benchmarks/trust/results.md). Reproduce them locally, at no cost: `make bench-trust` (needs [Ollama](https://ollama.com) with `qwen3.5:9b`).
+Full results, with every paired comparison: [benchmarks/trust/results.md](benchmarks/trust/results.md) (judged by qwen3.5:9b) and [results-gemma-judge.md](benchmarks/trust/results-gemma-judge.md). Reproduce them locally, at no cost: `make bench-trust` (needs [Ollama](https://ollama.com) with `qwen3.5:9b`).
 
 ## What it will look like
 
