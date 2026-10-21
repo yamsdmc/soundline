@@ -1,4 +1,6 @@
-from soundline.domain.answers import Citation, Claim, render
+import pytest
+
+from soundline.domain.answers import Answer, AnswerStatus, Citation, Claim, answer_to_dict, render
 from soundline.domain.quotes import Span
 
 RENT = Citation(source="lease.md", quote="Rent is due on the 5th", span=Span(0, 22))
@@ -31,3 +33,10 @@ def test_a_claim_without_closing_punctuation_ends_with_its_marker():
     text, _ = render([Claim("Rent is due on the 5th", (RENT,))])
 
     assert text == "Rent is due on the 5th [1]"
+
+
+@pytest.mark.spec("GEN-014")
+def test_the_json_form_of_an_answer_carries_its_prompt_version():
+    answer = Answer(AnswerStatus.ABSTAINED, prompt_version="grounded-v2")
+
+    assert answer_to_dict(answer)["prompt_version"] == "grounded-v2"

@@ -229,3 +229,45 @@ def test_search_explain_shows_each_step_with_its_duration(run: Run, docs: Path):
         "└─ fuse",
     ]
     assert "hits=" in tree[2]
+
+
+@pytest.mark.spec("GEN-014")
+def test_ask_uses_the_prompt_directory_named_by_soundline_prompt(
+    run: Run, docs: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    prompt = tmp_path / "house-v1"
+    prompt.mkdir()
+    (prompt / "system.txt").write_text("House rules.")
+    (prompt / "user.txt").write_text("$evidence\n$question\n$language_instruction")
+    scripted = ScriptedLanguageModel({"claims": [], "insufficient_evidence": "unclear"})
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+    monkeypatch.setenv("SOUNDLINE_PROMPT", str(prompt))
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return scripted
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    run("ingest", str(docs))
+
+    result = run("ask", "rent due 5th")
+
+    assert result.exit_code == 0, result.output
+    assert scripted.requests[0].system == "House rules."
+
+
+@pytest.mark.spec("GEN-014", "API-003")
+def test_an_invalid_prompt_directory_is_a_configuration_error(
+    run: Run, docs: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+    monkeypatch.setenv("SOUNDLINE_PROMPT", str(tmp_path / "missing"))
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return ScriptedLanguageModel()
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+
+    result = run("ask", "rent due 5th")
+
+    assert result.exit_code == 3
+    assert "prompt template" in result.stderr

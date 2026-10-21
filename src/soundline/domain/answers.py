@@ -51,6 +51,8 @@ class Answer:
     """Claims removed because none of their citations could be verified (GEN-033)."""
     lenient_parse: bool = False
     """The model's output needed the lenient parser (GEN-023)."""
+    prompt_version: str | None = None
+    """The prompt template the model saw; None when the model was not called (GEN-014)."""
 
 
 def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
@@ -85,4 +87,5 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
         "dropped_claims": answer.dropped_claims,
         "abstention_reason": answer.abstention_reason.value if answer.abstention_reason else None,
         "abstention_message": answer.abstention_message,
+        "prompt_version": answer.prompt_version,
     }

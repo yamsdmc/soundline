@@ -2,6 +2,7 @@
 
 from soundline.api import Soundline
 from soundline.application.ingest import IngestionReport, IngestionStatus, SourceResult
+from soundline.application.prompts import PromptTemplate
 from soundline.domain.answers import AbstentionReason, Answer, AnswerStatus, Citation
 from soundline.domain.errors import IndexMismatchError, SoundlineError
 from soundline.domain.filters import F, Filter, InvalidFilterError
@@ -19,6 +20,7 @@ __all__ = [
     "IngestionReport",
     "IngestionStatus",
     "InvalidFilterError",
+    "PromptTemplate",
     "Soundline",
     "SoundlineError",
     "SourceResult",

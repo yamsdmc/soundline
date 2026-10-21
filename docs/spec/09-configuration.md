@@ -77,6 +77,7 @@ citation_mode = "schema"            # "schema" | "native" (provider-native citat
 repair = false
 min_relevance = 0.0                 # requires a reranker to be meaningful
 instructions = ""
+# prompt = "./prompts/house-v1"    # a template directory (system.txt, user.txt); its name is the prompt_version (GEN-014)
 
 [evaluation]
 judge_model = ""                    # empty = generation model (one API key); reports warn about self-judging (EVL-042)

@@ -15,6 +15,7 @@ from soundline.application.ingest import IngestionReport, IngestionStatus, Inges
 from soundline.application.ingest_sources import ingest_sources
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import Embedder, Index, LanguageModel, RunStore, SourceReader
+from soundline.application.prompts import DEFAULT_PROMPT, PromptTemplate
 from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.datasets import DatasetError
@@ -43,6 +44,7 @@ class Soundline:
         *,
         reader: SourceReader | None = None,
         runs: RunStore | None = None,
+        prompt: PromptTemplate | None = None,
     ) -> None:
         chunking = chunking or ChunkingSettings()
         self._index = index
@@ -54,6 +56,7 @@ class Soundline:
         self._llm = llm
         self._reader = reader or _local_files()
         self._runs = runs or InMemoryRunStore()
+        self._prompt = prompt or DEFAULT_PROMPT  # GEN-014
 
     @classmethod
     def open(
@@ -62,6 +65,8 @@ class Soundline:
         llm: LanguageModel | None = None,
         embedder: Embedder | None = None,
         chunking: ChunkingSettings | None = None,
+        *,
+        prompt: PromptTemplate | None = None,
     ) -> Self:
         """A persistent index in `home` (one SQLite file, STO-040)."""
         from soundline.adapters.stores.sqlite import (  # noqa: PLC0415  # composition only
@@ -87,7 +92,8 @@ class Soundline:
         )
         from soundline.adapters.evals.json_files import JsonRunStore  # noqa: PLC0415
 
-        return cls(index, embedder, llm, chunking, runs=JsonRunStore(Path(home) / "evals" / "runs"))
+        runs = JsonRunStore(Path(home) / "evals" / "runs")
+        return cls(index, embedder, llm, chunking, runs=runs, prompt=prompt)
 
     def __enter__(self) -> Self:
         return self
@@ -105,13 +111,18 @@ class Soundline:
 
     @classmethod
     def in_memory(
-        cls, llm: LanguageModel, embedder: Embedder | None = None, max_tokens: int = 384
+        cls,
+        llm: LanguageModel,
+        embedder: Embedder | None = None,
+        max_tokens: int = 384,
+        *,
+        prompt: PromptTemplate | None = None,
     ) -> Self:
         """A non-persistent, offline instance, for tests and notebooks."""
         embedder = embedder or HashingEmbedder()
         dense = InMemoryVectorIndex(embedder.dimension)
         index = Index(InMemoryDocumentStore(), InMemoryIndex(), dense, InMemoryManifestStore())
-        return cls(index, embedder, llm, ChunkingSettings(max_tokens=max_tokens))
+        return cls(index, embedder, llm, ChunkingSettings(max_tokens=max_tokens), prompt=prompt)
 
     def ingest_text(
         self, source: str, text: str, metadata: Metadata | None = None
@@ -165,7 +176,7 @@ class Soundline:
                 "asking needs a language model: set SOUNDLINE_LLM (e.g."
                 " anthropic:claude-sonnet-5-5), or use search, which needs none"
             )
-        return ask(question, self._retriever, self._llm)
+        return ask(question, self._retriever, self._llm, prompt=self._prompt)
 
     def evaluate(
         self,

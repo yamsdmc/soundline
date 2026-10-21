@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from soundline.application.ports import GenerationRequest, LanguageModel, Retriever
-from soundline.application.prompts import DEFAULT_PROMPT
+from soundline.application.prompts import DEFAULT_PROMPT, PromptTemplate
 from soundline.domain.answers import (
     AbstentionReason,
     Answer,
@@ -40,18 +40,26 @@ class _ModelOutput:
     lenient: bool
 
 
-def ask(question: str, retriever: Retriever, llm: LanguageModel, k: int = 5) -> Answer:
+def ask(
+    question: str,
+    retriever: Retriever,
+    llm: LanguageModel,
+    k: int = 5,
+    *,
+    prompt: PromptTemplate = DEFAULT_PROMPT,
+) -> Answer:
     evidence = {f"E{rank}": chunk for rank, chunk in enumerate(retriever.search(question, k), 1)}
     if not evidence:  # GEN-001: no evidence, no model call
         return Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
 
-    output = _generate(llm, DEFAULT_PROMPT.render(question, evidence))
+    output = _generate(llm, prompt.render(question, evidence))
     if output.insufficient_evidence is not None:  # GEN-021
         return Answer(
             AnswerStatus.ABSTAINED,
             abstention_reason=AbstentionReason.MODEL_INSUFFICIENT_EVIDENCE,
             abstention_message=output.insufficient_evidence,
             lenient_parse=output.lenient,
+            prompt_version=prompt.version,
         )
 
     verified = [_verified(claim, evidence) for claim in output.claims]
@@ -63,6 +71,7 @@ def ask(question: str, retriever: Retriever, llm: LanguageModel, k: int = 5) -> 
             abstention_reason=AbstentionReason.UNSUPPORTED_CLAIMS,
             dropped_claims=dropped,
             lenient_parse=output.lenient,
+            prompt_version=prompt.version,
         )
     text, citations = render(supported)
     status = AnswerStatus.PARTIAL if dropped else AnswerStatus.ANSWERED  # GEN-034
@@ -72,6 +81,7 @@ def ask(question: str, retriever: Retriever, llm: LanguageModel, k: int = 5) -> 
         citations=citations,
         dropped_claims=dropped,
         lenient_parse=output.lenient,
+        prompt_version=prompt.version,
     )
 
 

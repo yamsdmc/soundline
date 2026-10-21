@@ -1,9 +1,11 @@
 import json
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
 from soundline.application.ask import ask
+from soundline.application.prompts import PromptTemplate
 from soundline.domain.answers import AbstentionReason, AnswerStatus
 from soundline.domain.chunks import Chunk
 from soundline.domain.errors import GenerationError
@@ -212,3 +214,49 @@ def test_the_rendered_prompt_is_approved(approve: Callable[[str], None]):
 
     request = llm.requests[0]
     approve(f"=== system ===\n{request.system}\n=== prompt ===\n{request.prompt}\n")
+
+
+@pytest.mark.spec("GEN-015")
+def test_a_french_question_over_english_evidence_asks_for_a_french_answer():
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
+
+    ask("Quand le loyer rent est-il dû ?", index_with_lease(), llm)
+
+    assert "Write each claim in French" in llm.requests[0].prompt
+
+
+@pytest.mark.spec("GEN-015")
+def test_without_a_clear_language_the_answer_follows_the_question_anyway():
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
+
+    ask("rent?", index_with_lease(), llm)
+
+    assert "Write each claim in the language of the question" in llm.requests[0].prompt
+
+
+@pytest.mark.spec("GEN-014")
+def test_the_answer_records_the_prompt_version():
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
+
+    answer = ask("When is rent due?", index_with_lease(), llm)
+
+    assert answer.prompt_version == "grounded-v2"
+
+
+@pytest.mark.spec("GEN-014")
+def test_a_custom_prompt_is_used_and_recorded(tmp_path: Path):
+    directory = tmp_path / "terse-v2"
+    directory.mkdir()
+    (directory / "system.txt").write_text("Terse.")
+    (directory / "user.txt").write_text("$evidence\n$question\n$language_instruction")
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
+
+    answer = ask(
+        "When is rent due?",
+        index_with_lease(),
+        llm,
+        prompt=PromptTemplate.from_directory(directory),
+    )
+
+    assert llm.requests[0].system == "Terse."
+    assert answer.prompt_version == "terse-v2"

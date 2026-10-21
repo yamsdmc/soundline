@@ -13,6 +13,7 @@ import typer
 from soundline import Soundline
 from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec, llm_from_spec
 from soundline.application.ingest import IngestionReport, IngestionStatus
+from soundline.application.prompts import PromptTemplate
 from soundline.domain.answers import AnswerStatus, answer_to_dict
 from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import (
@@ -57,7 +58,11 @@ def _soundline() -> Generator[Soundline]:
     llm_spec = os.environ.get("SOUNDLINE_LLM")
     try:
         llm = llm_from_spec(llm_spec) if llm_spec else None
-        with Soundline.open(home, llm=llm, embedder=embedder_from_spec(embedder)) as soundline:
+        prompt_dir = os.environ.get("SOUNDLINE_PROMPT")  # GEN-014
+        prompt = PromptTemplate.from_directory(prompt_dir) if prompt_dir else None
+        with Soundline.open(
+            home, llm=llm, embedder=embedder_from_spec(embedder), prompt=prompt
+        ) as soundline:
             yield soundline
     except (InvalidFilterError, DatasetError, RunMismatchError) as error:
         _fail(error, USAGE_ERROR)

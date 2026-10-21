@@ -1,0 +1,9 @@
+$evidence
+
+Question: $question
+
+$language_instruction
+
+Respond with JSON only, in one of these two forms:
+{"claims": [{"text": "<one sentence>", "citations": [{"evidence_id": "E1", "quote": "<verbatim>"}]}], "insufficient_evidence": null}
+{"claims": [], "insufficient_evidence": "<why the evidence does not answer>"}
