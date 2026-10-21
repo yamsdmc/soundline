@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Iterator, Mapping, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
@@ -238,11 +239,14 @@ class Soundline:
         retrieval_only: bool = False,
         no_cache: bool = False,
         judge: LanguageModel | None = None,
+        without_verification: bool = False,
     ) -> EvalRun:
         """Evaluates a JSONL dataset and stores the run (EVL-060): end to end when a language
         model is configured, retrieval-only otherwise or on request (EVL-062). Model calls
         are cached by input, so a rerun is reproducible and free; `no_cache` forces fresh
-        calls (EVL-061). A `judge` model adds faithfulness, claim by claim (EVL-021)."""
+        calls (EVL-061). A `judge` model adds faithfulness, claim by claim (EVL-021).
+        `without_verification` shows claims as the model wrote them, to measure what
+        verification brings (GEN-080, EVL-092)."""
         check_pipeline(self._index.manifest, self._manifest)
         if not Path(dataset).is_file():
             raise DatasetError(f"dataset file not found: {dataset}")
@@ -253,12 +257,14 @@ class Soundline:
                 llm = CachedLanguageModel(llm, self._generation_cache)
                 if judge is not None:
                     judge = CachedLanguageModel(judge, self._generation_cache)
+            settings = replace(self._generation, verify=not without_verification)
             generator = Generator(
-                lambda question: ask(question, self._retriever, llm, self._generation),
+                lambda question: ask(question, self._retriever, llm, settings),
                 {
                     "model": self._llm.model_id,
-                    "prompt_version": self._generation.prompt.version,
-                    "k": self._generation.k,
+                    "prompt_version": settings.prompt.version,
+                    "k": settings.k,
+                    "verify": settings.verify,
                 },
                 FaithfulnessJudge(judge) if judge else None,
                 self._calibration_of(judge),

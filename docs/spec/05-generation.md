@@ -107,6 +107,10 @@ Verification compares a quote with the cited evidence text, under a **matching l
 - **GEN-070** Token usage and estimated cost MUST be reported per stage (rewrite, generation, repair) in `answer.usage`, using a configurable price table.
 - **GEN-071** A maximum output token limit MUST be enforced. A truncated model output (stop reason `max_tokens`) is treated as invalid output (GEN-020).
 
+### Verification off (benchmarking only)
+
+- **GEN-080** To measure what verification brings (EVL-092), it MAY be disabled with `verify = false`. Every citation to a known evidence item is then kept as the model wrote it: when its quote fails verification, it is shown with the model's quote, at the span of the whole evidence item, and flagged `verified: false`. Claims without any verified citation are kept, so the answer is `ANSWERED` unless the model declares the evidence insufficient. Citations to unknown evidence IDs are still removed: nothing can be shown for them. This setting exists for evaluation; documentation MUST NOT present it as a production option.
+
 ## Invariants
 
 - **INV-GEN-1** Every citation in an `ANSWERED` or `PARTIAL` answer has a quote that is a substring of its document's normalized text at its resolved span: `doc.normalized_text[c.start:c.end] == c.quote`.

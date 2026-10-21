@@ -65,6 +65,8 @@ Computed on the ranked hits of `search` (before context assembly), for configura
 | `citation_validity` | Fraction of model citations that passed verification (before removal) | deterministic |
 | `citation_recall` | Fraction of relevant quotes cited by the answer | deterministic (span overlap) |
 | `support_rate` | Fraction of claims with ≥ 1 verified citation | deterministic |
+| `shown_citation_validity` | Fraction of the citations shown to the user that are verified (1 by construction with verification on, GEN-080) | deterministic |
+| `shown_support_rate` | Fraction of the claims shown to the user with ≥ 1 verified citation (1 by construction with verification on) | deterministic |
 | `faithfulness` | Fraction of claims entailed by their cited quotes | LLM judge |
 | `correctness` | Agreement of the answer with the reference answer (rubric score 0–1) | LLM judge |
 | `abstention_precision` | Among abstentions, the fraction on unanswerable cases | deterministic |

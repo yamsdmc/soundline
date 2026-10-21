@@ -83,12 +83,19 @@ def generation_metrics(
         metrics["false_answer_rate"] = 0.0 if abstained else 1.0  # EVL-003
     if abstained:
         metrics["abstention_precision"] = 0.0 if answerable else 1.0
-    verified = [citation for claim in answer.claims for citation in claim.citations]
+    shown = [citation for claim in answer.claims for citation in claim.citations]
+    verified = [citation for citation in shown if citation.verified]
+    supported = [claim for claim in answer.claims if any(c.verified for c in claim.citations)]
     if answer.citations_proposed:
         metrics["citation_validity"] = len(verified) / answer.citations_proposed
     if answer.claims or answer.dropped_claims:
         total = len(answer.claims) + len(answer.dropped_claims)
-        metrics["support_rate"] = len(answer.claims) / total
+        metrics["support_rate"] = len(supported) / total
+    # What the user sees: all verified by construction, unless verification is off (GEN-080).
+    if shown:
+        metrics["shown_citation_validity"] = len(verified) / len(shown)
+    if answer.claims:
+        metrics["shown_support_rate"] = len(supported) / len(answer.claims)
     if answerable:
         cited = [Located(c.source, c.span) for c in verified]
         recalled = [

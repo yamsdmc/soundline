@@ -305,6 +305,13 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
         str | None,
         typer.Option(help="Judge model for faithfulness, e.g. anthropic:claude-opus-5-5."),
     ] = None,
+    without_verification: Annotated[
+        bool,
+        typer.Option(
+            help="Benchmarking only: show claims as the model wrote them, to measure what"
+            " verification brings (GEN-080)."
+        ),
+    ] = False,
     as_json: JsonOption = False,
 ) -> None:
     with _soundline() as soundline:
@@ -315,12 +322,15 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
             retrieval_only=retrieval_only,
             no_cache=no_cache,
             judge=llm_from_spec(judge) if judge else None,
+            without_verification=without_verification,
         )
     if as_json:
         typer.echo(json.dumps(run.to_dict()))
         return
     mode = run.settings.get("mode")
     model = f", model {run.settings['model']}" if "model" in run.settings else ""
+    if run.settings.get("verify") is False:
+        model += ", verification off"
     typer.echo(f"run {run.name} ({mode}{model}): {run.dataset['cases']} cases")
     judged = run.settings.get("judge")
     if isinstance(judged, Mapping):

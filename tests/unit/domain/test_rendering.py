@@ -102,8 +102,17 @@ def test_the_json_form_lists_claims_with_their_citations_and_the_proposed_count(
                     "span": [0, 22],
                     "section_path": [],
                     "approximate": False,
+                    "verified": True,
                 }
             ],
         }
     ]
     assert data["citations_proposed"] == 2
+
+
+@pytest.mark.spec("GEN-080")
+def test_a_claim_shown_without_citation_renders_without_a_marker():
+    text, citations = render([Claim("Pets are allowed.", ()), Claim("Rent is due.", (RENT,))])
+
+    assert text == "Pets are allowed. Rent is due [1]."
+    assert citations == [RENT]

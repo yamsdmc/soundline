@@ -157,3 +157,34 @@ def test_an_unreadable_verdict_leaves_the_case_unjudged_with_a_warning(dataset: 
 
     assert "faithfulness" not in run.per_case["rent-due"]
     assert any("1 unreadable" in warning for warning in run.warnings)
+
+
+@pytest.mark.spec("GEN-080", "EVL-092")
+def test_a_run_without_verification_shows_what_the_model_wrote_and_says_so(dataset: Path):
+    llm = ScriptedLanguageModel(
+        {
+            "claims": [
+                {
+                    "text": "Rent is due on the 1st.",
+                    "citations": [{"evidence_id": "E1", "quote": "Rent is due on the 1st"}],
+                }
+            ]
+        },
+        {
+            "claims": [
+                {
+                    "text": "Parking is free.",
+                    "citations": [{"evidence_id": "E1", "quote": "Parking is free"}],
+                }
+            ]
+        },
+    )
+    soundline = Soundline.in_memory(llm=llm)
+    soundline.ingest_text("lease.md", LEASE)
+
+    run = soundline.evaluate(dataset, "unverified", without_verification=True)
+
+    assert run.settings["verify"] is False
+    assert run.per_case["parking"]["false_answer_rate"] == 1.0
+    assert run.per_case["rent-due"]["shown_citation_validity"] == 0.0
+    assert soundline.evaluate(dataset, "verified").settings["verify"] is True

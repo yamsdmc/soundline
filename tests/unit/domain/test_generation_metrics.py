@@ -42,6 +42,8 @@ def test_an_answered_case_scores_its_citations_and_claims():
         "answer_rate": 1.0,
         "citation_validity": pytest.approx(2 / 5),
         "support_rate": pytest.approx(2 / 4),
+        "shown_citation_validity": 1.0,
+        "shown_support_rate": 1.0,
         "citation_recall": 0.5,
         "approximate_citation_rate": 0.5,
         "lenient_parse_rate": 0.0,
@@ -91,3 +93,36 @@ def test_a_short_citation_inside_a_long_relevant_quote_recalls_it():
     )
 
     assert metrics["citation_recall"] == 1.0
+
+
+UNVERIFIED = Citation("lease.md", "Parking is free", Span(0, 400), verified=False)
+
+
+@pytest.mark.spec("EVL-020", "GEN-080")
+def test_what_the_user_is_shown_is_scored_apart_from_what_the_model_proposed():
+    answer = answered(
+        Claim("Rent is due on the 5th.", (FIVE, UNVERIFIED)),
+        Claim("Parking is free.", (UNVERIFIED,)),
+        Claim("Here is the lease:", ()),
+        proposed=3,
+    )
+
+    metrics = generation_metrics(answer, [RENT_QUOTE, LATE_QUOTE], answerable=True)
+
+    assert metrics["citation_validity"] == pytest.approx(1 / 3)
+    assert metrics["support_rate"] == pytest.approx(1 / 3)
+    assert metrics["shown_citation_validity"] == pytest.approx(1 / 3)
+    assert metrics["shown_support_rate"] == pytest.approx(1 / 3)
+    assert metrics["citation_recall"] == 0.5  # an unverified span covers nothing
+    assert metrics["approximate_citation_rate"] == 0.0
+
+
+@pytest.mark.spec("EVL-020")
+def test_with_verification_everything_shown_is_verified():
+    answer = answered(Claim("Rent is due on the 5th.", (FIVE,)), dropped=1, proposed=2)
+
+    metrics = generation_metrics(answer, [RENT_QUOTE], answerable=True)
+
+    assert metrics["shown_citation_validity"] == 1.0
+    assert metrics["shown_support_rate"] == 1.0
+    assert metrics["support_rate"] == 0.5

@@ -59,6 +59,8 @@ class GenerationSettings:
     condense_prompt: PromptTemplate = CONDENSE_PROMPT  # RET-071
     history_budget_tokens: int = 1500  # GEN-062
     prices: Mapping[str, Price] = field(default_factory=dict[str, Price])  # GEN-070
+    verify: bool = True
+    """False only to measure what verification brings (GEN-080, EVL-092)."""
 
 
 def ask(
@@ -112,12 +114,12 @@ def ask_stream(
             return
         request = grounded_request(settings.prompt, question, evidence, packed.turns)
         output = _generate(calls, request)
-        verified = [_verified(claim, evidence) for claim in output.claims]
+        verified = [_verified(claim, evidence, settings.verify) for claim in output.claims]
         if output.insufficient_evidence is None:
             for claim in verified:
                 if claim.citations:
                     yield ClaimVerified(claim)
-        answer = _answer(output, verified)
+        answer = _answer(output, verified, settings.verify)
         yield completed(
             replace(
                 answer,
@@ -151,13 +153,16 @@ def _condensed(
     return question
 
 
-def _answer(output: "_ModelOutput", verified: Sequence[Claim]) -> Answer:
+def _answer(output: "_ModelOutput", verified: Sequence[Claim], verify: bool) -> Answer:
     if output.insufficient_evidence is not None:  # GEN-021
         return Answer(
             AnswerStatus.ABSTAINED,
             abstention_reason=AbstentionReason.MODEL_INSUFFICIENT_EVIDENCE,
             abstention_message=output.insufficient_evidence,
         )
+    if not verify:  # GEN-080: every claim is shown as the model wrote it
+        text, citations = render(verified)
+        return Answer(AnswerStatus.ANSWERED, text=text, citations=citations, claims=tuple(verified))
     supported = [claim for claim in verified if claim.citations]
     dropped = [claim.text for claim in verified if not claim.citations]  # GEN-033
     if not supported:
@@ -249,8 +254,9 @@ def _claim(item: object) -> _ModelClaim:
     return _ModelClaim(str(claim.get("text", "")), citations)
 
 
-def _verified(claim: _ModelClaim, evidence: Mapping[str, Chunk]) -> Claim:
-    """Keeps only citations whose quote is verified in the cited evidence (GEN-030 to 039)."""
+def _verified(claim: _ModelClaim, evidence: Mapping[str, Chunk], verify: bool) -> Claim:
+    """Keeps only citations whose quote is verified in the cited evidence (GEN-030 to 039);
+    without verification, failed ones too, flagged at the evidence's span (GEN-080)."""
     citations: list[Citation] = []
     for evidence_id, quote in claim.citations:
         chunk = evidence.get(evidence_id)
@@ -258,6 +264,10 @@ def _verified(claim: _ModelClaim, evidence: Mapping[str, Chunk]) -> Claim:
             continue  # unknown evidence ID (GEN-030)
         result = verify_quote(quote, chunk.text)
         if result.method is Method.FAILED:
+            if not verify:
+                citations.append(
+                    Citation(chunk.source, quote, chunk.span, False, chunk.section_path, False)
+                )
             continue
         span = result.span.shifted_by(chunk.span.start)
         citations.append(

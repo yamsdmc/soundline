@@ -34,6 +34,9 @@ class Citation:
     """Verified by fuzzy matching; the quote shown is still the source text (GEN-038)."""
     section_path: tuple[str, ...] = ()
     """Where the quote sits in its document (GEN-031)."""
+    verified: bool = True
+    """False only with verification disabled, for benchmarking (GEN-080): the quote is the
+    model's and the span is the whole evidence item."""
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,9 @@ def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
             if citation not in numbered:
                 numbered.append(citation)
         markers = "".join(f"[{numbered.index(c) + 1}]" for c in claim.citations)
+        if not markers:  # only with verification disabled (GEN-080)
+            sentences.append(claim.text)
+            continue
         body = claim.text.rstrip(_CLOSING_PUNCTUATION)
         closing = claim.text[len(body) :]
         sentences.append(f"{body} {markers}{closing}")
@@ -143,4 +149,5 @@ def _citation_to_dict(citation: Citation) -> dict[str, object]:
         "span": [citation.span.start, citation.span.end],
         "section_path": list(citation.section_path),
         "approximate": citation.approximate,
+        "verified": citation.verified,
     }

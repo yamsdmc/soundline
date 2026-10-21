@@ -361,3 +361,52 @@ def test_each_evidence_shows_its_section_which_carries_conditions():
 
     assert 'section="Furnished > Inventory matches"' in llm.requests[0].prompt
     assert "keep the conditions" in llm.requests[0].system
+
+
+UNVERIFIED = GenerationSettings(verify=False)
+
+
+@pytest.mark.spec("GEN-080")
+def test_without_verification_a_failed_quote_is_shown_flagged_at_the_evidence_span():
+    llm = ScriptedLanguageModel(citing("E1", "Parking is free"))
+
+    answer = ask("When is rent due?", index_with_lease(), llm, UNVERIFIED)
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert [(c.quote, c.span, c.verified) for c in answer.citations] == [
+        ("Parking is free", Span(0, len(LEASE)), False)
+    ]
+
+
+@pytest.mark.spec("GEN-080")
+def test_without_verification_a_quote_that_verifies_is_still_resolved_and_flagged_verified():
+    llm = ScriptedLanguageModel(citing("E1", "Pets are allowed"))
+
+    answer = ask("Are pets allowed?", index_with_lease(), llm, UNVERIFIED)
+
+    assert [(c.span, c.verified) for c in answer.citations] == [(Span(24, 40), True)]
+
+
+@pytest.mark.spec("GEN-080")
+def test_without_verification_uncited_claims_are_kept_and_unknown_evidence_is_removed():
+    llm = ScriptedLanguageModel(
+        {
+            "claims": [
+                claim("Here is what the lease says:"),
+                {
+                    "text": "Rent is due on the 5th.",
+                    "citations": [{"evidence_id": "E9", "quote": "Rent is due on the 5th"}],
+                },
+            ]
+        }
+    )
+
+    answer = ask("When is rent due?", index_with_lease(), llm, UNVERIFIED)
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert [(c.text, c.citations) for c in answer.claims] == [
+        ("Here is what the lease says:", ()),
+        ("Rent is due on the 5th.", ()),
+    ]
+    assert answer.dropped_claims == []
+    assert answer.citations_proposed == 1
