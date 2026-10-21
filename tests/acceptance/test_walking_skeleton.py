@@ -9,6 +9,7 @@ from soundline import (
     PromptTemplate,
     Soundline,
 )
+from soundline.domain.events import RetrievalCompleted
 from soundline.testing import ScriptedLanguageModel
 
 
@@ -77,4 +78,28 @@ def test_a_conversation_carries_previous_turns_as_text_into_follow_ups():
     assert follow_up.query is not None
     assert follow_up.query.search_query == "late fees for rent"
     assert "Assistant: Rent is due on the 5th." in llm.requests[1].prompt  # no [1] marker
+    assert [turn.question for turn in chat.turns] == ["When is rent due?", "And late fees?"]
+
+
+@pytest.mark.spec("GEN-050", "GEN-061")
+def test_a_conversation_streams_its_answers_and_remembers_them():
+    llm = ScriptedLanguageModel(
+        answer_citing("Rent is due on the 5th.", "Rent is due on the 5th"),
+        {"query": "late fees for rent"},
+        answer_citing("Late fees are 10 euros per day.", "Late fees are 10 euros per day"),
+    )
+    soundline = Soundline.in_memory(llm=llm)
+    soundline.ingest_text("lease.md", "Rent is due on the 5th. Late fees are 10 euros per day.")
+    chat = soundline.conversation()
+
+    first = list(chat.ask_stream("When is rent due?"))
+    second = list(chat.ask_stream("And late fees?"))
+
+    assert [type(event).__name__ for event in first] == [
+        "RetrievalCompleted",
+        "ClaimVerified",
+        "AnswerCompleted",
+    ]
+    assert isinstance(second[0], RetrievalCompleted)
+    assert second[0].search_query == "late fees for rent"
     assert [turn.question for turn in chat.turns] == ["When is rent due?", "And late fees?"]

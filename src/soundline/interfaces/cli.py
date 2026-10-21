@@ -15,7 +15,7 @@ from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec, llm_from_spec
 from soundline.application.ask import GenerationSettings
 from soundline.application.ingest import IngestionReport, IngestionStatus
 from soundline.application.prompts import PromptTemplate
-from soundline.domain.answers import AnswerStatus, answer_to_dict
+from soundline.domain.answers import Answer, AnswerStatus, answer_to_dict
 from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import (
     ConfigurationError,
@@ -24,6 +24,7 @@ from soundline.domain.errors import (
     ProviderUnavailableError,
     SoundlineError,
 )
+from soundline.domain.events import AnswerCompleted, RetrievalCompleted, StreamError
 from soundline.domain.filters import InvalidFilterError
 from soundline.domain.runs import (
     RunMismatchError,
@@ -189,6 +190,38 @@ def ask(question: str, as_json: JsonOption = False) -> None:
     if as_json:
         typer.echo(json.dumps(answer_to_dict(answer)))
         return
+    _print_answer(answer)
+
+
+@app.command(help="Converse: follow-ups are understood in context. Ctrl-D or /exit quits.")
+def chat() -> None:
+    with _soundline() as soundline:
+        conversation = soundline.conversation()
+        while (question := _read_question()) is not None:
+            for event in conversation.ask_stream(question):
+                if isinstance(event, RetrievalCompleted) and event.search_query != question:
+                    typer.echo(f"searching: {event.search_query}")  # RET-071
+                elif isinstance(event, StreamError):
+                    raise event.error  # mapped to an exit code by _soundline
+                elif isinstance(event, AnswerCompleted):
+                    if event.answer.usage.stages:
+                        typer.echo(_usage_line(event.answer.usage), err=True)
+                    _print_answer(event.answer)
+            typer.echo()
+
+
+def _read_question() -> str | None:
+    try:
+        line = input("> ")
+    except EOFError:
+        return None
+    question = line.strip()
+    if question == "/exit":
+        return None
+    return question or _read_question()
+
+
+def _print_answer(answer: Answer) -> None:
     if answer.status is AnswerStatus.ABSTAINED:
         reason = answer.abstention_reason.value if answer.abstention_reason else "unknown"
         typer.echo(f"No answer ({reason}). {answer.abstention_message or ''}".rstrip())

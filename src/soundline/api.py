@@ -1,13 +1,13 @@
 """The public Python API, and the composition root that wires adapters to ports (ARC-006)."""
 
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Self
 
-from soundline.application.ask import GenerationSettings, ask
+from soundline.application.ask import GenerationSettings, ask, ask_stream
 from soundline.application.diagnostics import Check, diagnose
 from soundline.application.evaluate import DatasetFile, EvalSettings, run_retrieval_eval
 from soundline.application.hybrid_retriever import HybridRetriever
@@ -20,6 +20,7 @@ from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.conversation import Turn
 from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import ConfigurationError
+from soundline.domain.events import AnswerCompleted, AskEvent
 from soundline.domain.filters import Filter, Metadata, parse_filter
 from soundline.domain.hits import Hit, SearchResult
 from soundline.domain.manifest import Manifest
@@ -178,12 +179,19 @@ class Soundline:
 
     def ask(self, question: str, history: Sequence[Turn] = ()) -> Answer:
         """`history`: previous turns, text only; context for the model, never evidence."""
+        return ask(question, self._retriever, self._require_llm(), self._generation, history)
+
+    def ask_stream(self, question: str, history: Sequence[Turn] = ()) -> Iterator[AskEvent]:
+        """Like ask, as events; claims are streamed only once verified (GEN-050, GEN-051)."""
+        return ask_stream(question, self._retriever, self._require_llm(), self._generation, history)
+
+    def _require_llm(self) -> LanguageModel:
         if self._llm is None:
             raise ConfigurationError(  # CLI-004
                 "asking needs a language model: set SOUNDLINE_LLM (e.g."
                 " anthropic:claude-sonnet-5-5), or use search, which needs none"
             )
-        return ask(question, self._retriever, self._llm, self._generation, history)
+        return self._llm
 
     def evaluate(
         self,
@@ -233,6 +241,13 @@ class Conversation:
         answer = self._soundline.ask(question, self.turns)
         self.turns.append(Turn(question, history_text(answer)))
         return answer
+
+    def ask_stream(self, question: str) -> Iterator[AskEvent]:
+        """The turn is remembered once its answer completes."""
+        for event in self._soundline.ask_stream(question, self.turns):
+            if isinstance(event, AnswerCompleted):
+                self.turns.append(Turn(question, history_text(event.answer)))
+            yield event
 
 
 def embedder_from_spec(spec: str) -> Embedder:

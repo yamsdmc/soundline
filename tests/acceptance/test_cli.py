@@ -18,8 +18,8 @@ def run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Run:
     monkeypatch.setenv("SOUNDLINE_EMBEDDER", "hashing:256")  # offline and deterministic
     runner = CliRunner()
 
-    def invoke(*args: str) -> Result:
-        return runner.invoke(app, list(args))
+    def invoke(*args: str, input: str | None = None) -> Result:  # CliRunner's name
+        return runner.invoke(app, list(args), input=input)
 
     return invoke
 
@@ -295,3 +295,34 @@ def test_ask_reports_tokens_and_cost_on_stderr(
     assert "usage: 9,000 tokens in (1,000 cached), 210 out" in result.stderr
     assert "cost unknown: no price for scripted:test" in result.stderr
     assert "usage" not in result.stdout
+
+
+@pytest.mark.spec("GEN-061", "RET-071")
+def test_chat_answers_follow_ups_in_one_conversation(
+    run: Run, docs: Path, monkeypatch: pytest.MonkeyPatch
+):
+    def answer(text: str) -> dict[str, object]:
+        return {
+            "claims": [{"text": text, "citations": [{"evidence_id": "E1", "quote": text[:-1]}]}],
+            "insufficient_evidence": None,
+        }
+
+    scripted = ScriptedLanguageModel(
+        answer("Rent is due on the 5th."),
+        {"query": "rent due 5th"},
+        answer("Rent is due on the 5th."),
+    )
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return scripted
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    run("ingest", str(docs))
+
+    result = run("chat", input="rent due 5th\nand again?\n")
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.count("Rent is due on the 5th [1].") == 2
+    assert "searching: rent due 5th\n" in result.stdout
+    assert len(scripted.requests) == 3

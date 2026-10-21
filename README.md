@@ -67,6 +67,15 @@ for c in answer.citations:
     print(c.document.source, c.location.page, c.quote)
 ```
 
+```python
+chat = sl.conversation()  # or `soundline chat`
+chat.ask("When is the rent due?")
+chat.ask("And if I'm late?")  # understood in context, cited from this turn's evidence only
+
+for event in sl.ask_stream("What about pets?"):  # each claim arrives already verified
+    print(event)
+```
+
 ```bash
 soundline eval run datasets/contracts.jsonl
 soundline eval gate latest --baseline main --rules gates.toml   # exit 1 on a significant regression
