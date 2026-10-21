@@ -69,7 +69,7 @@ packages = ["src/soundline"]
 [tool.pytest.ini_options]
 minversion = "8.3"
 testpaths = ["tests"]
-pythonpath = ["scripts"]
+pythonpath = ["scripts", "benchmarks/trust"]
 addopts = [
     "--strict-markers", "--strict-config", "--disable-socket", "--allow-unix-socket", "-ra",
     "-m", "not live and not models",
@@ -87,7 +87,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests", "scripts"]
+src = ["src", "tests", "scripts", "benchmarks"]
 extend-exclude = ["*.md"]  # spec code blocks are hand-formatted documentation
 
 [tool.ruff.lint]
@@ -105,9 +105,12 @@ ignore = [
 # --- Types -------------------------------------------------------------------
 
 [tool.pyright]
-include = ["src", "tests", "scripts"]
-exclude = ["scripts/probe_sqlite.py"]  # ARC-014 spike, runs outside the project env (see ADR 0012)
-extraPaths = ["scripts"]
+include = ["src", "tests", "scripts", "benchmarks"]
+exclude = [
+    "scripts/probe_sqlite.py",  # ARC-014 spike, runs outside the project env (see ADR 0012)
+    "benchmarks/trust/naive_rag.py",  # runs in its own environment (PEP 723)
+]
+extraPaths = ["scripts", "benchmarks/trust"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"

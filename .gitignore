@@ -14,3 +14,4 @@ htmlcov/
 
 # Approval tests: text awaiting review
 tests/approvals/*.received.txt
+.soundline-bench/
