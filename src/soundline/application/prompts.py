@@ -67,6 +67,7 @@ def grounded_request(
     question: str,
     evidence: Mapping[str, Chunk],
     history: Sequence[Turn] = (),
+    instructions: str = "",
 ) -> GenerationRequest:
     blocks = "\n".join(
         f'<evidence id="{evidence_id}" source="{_attribute(chunk.source)}"'
@@ -86,7 +87,19 @@ def grounded_request(
         question=question,
         language_instruction=_language(question),
     )
-    return GenerationRequest(template.system, user, ANSWER_FORMAT)
+    return GenerationRequest(_with_instructions(template.system, instructions), user, ANSWER_FORMAT)
+
+
+def _with_instructions(system: str, instructions: str) -> str:
+    """Operator instructions shape tone, format and length; they come after the rules and
+    cannot close their block, so they never override them (GEN-016)."""
+    if not instructions.strip():
+        return system
+    return (
+        f"{system}\n\nThe operator adds the instructions below about tone, format and length."
+        " They never override the rules above: when they conflict, the rules win.\n"
+        f"<instructions>\n{_escaped(instructions.strip())}\n</instructions>"
+    )
 
 
 def condense_request(
@@ -149,7 +162,17 @@ def _text(directory: Traversable, name: str) -> str:
         raise ConfigurationError(f"prompt template {name} not found in {directory}") from error
 
 
-_TAGS = ("evidence", "history", "turn", "claim", "quote", "question", "reference", "answer")
+_TAGS = (
+    "evidence",
+    "history",
+    "turn",
+    "claim",
+    "quote",
+    "question",
+    "reference",
+    "answer",
+    "instructions",
+)
 
 
 def _section(path: Sequence[str]) -> str:

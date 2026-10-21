@@ -66,6 +66,8 @@ class GenerationSettings:
     prices: Mapping[str, Price] = field(default_factory=dict[str, Price])  # GEN-070
     verify: bool = True
     """False only to measure what verification brings (GEN-080, EVL-092)."""
+    instructions: str = ""
+    """Operator instructions on tone, format and length (GEN-016)."""
 
 
 def ask(
@@ -117,7 +119,9 @@ def ask_stream(
                 Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
             )
             return
-        request = grounded_request(settings.prompt, question, evidence, packed.turns)
+        request = grounded_request(
+            settings.prompt, question, evidence, packed.turns, settings.instructions
+        )
         output = _generate(calls, request)
         chunks = list(evidence.values())
         verified = [

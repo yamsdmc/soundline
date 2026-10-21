@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Operator instructions (GEN-016): `GenerationSettings(instructions=...)` adds instructions on tone, format and length after the system prompt's rules, in an escaped block that says they never override them.
 - Conditions of a section (GEN-094 to GEN-096): when a claim is quoted only under a section that has a sibling in the same document ("Logement vide" next to "Logement meublé") and does not name it, the answer shows the condition with the claim: `Le préavis est de 3 mois (Logement vide) [1].` Deterministic, whatever the model; judges read claims as shown. Prompt `grounded-v6` also asks the model to start such claims with their case.
 - Correctness judge (EVL-045): with `--judge`, cases that have a `reference_answer` are scored `correct` (1), `partial` (0.5) or `incorrect` (0), the answer read as plain text so the judge cannot tell which system wrote it. Prompt `correctness-v1`; the trust benchmark scores the naive baseline the same way.
 - Conflicting sources (GEN-090 to GEN-093): when evidence items disagree, the model reports it and states each version as its own cited claim; Soundline keeps a conflict only between at least two documents the answer cites, and shows it (`Sources disagree on ...: [1] [2]` in the CLI, `conflicts` in JSON, marked in the viewer). New prompt `grounded-v5`; new metric `conflict_rate`.
