@@ -16,14 +16,14 @@ def answered(*claims: Claim, dropped: int = 0, proposed: int = 0) -> Answer:
         claims=claims,
         dropped_claims=[f"dropped {n}" for n in range(dropped)],
         citations_proposed=proposed,
-        prompt_version="grounded-v3",
+        prompt_version="grounded-v4",
     )
 
 
 ABSTAINED = Answer(
     AnswerStatus.ABSTAINED,
     abstention_reason=AbstentionReason.MODEL_INSUFFICIENT_EVIDENCE,
-    prompt_version="grounded-v3",
+    prompt_version="grounded-v4",
 )
 
 

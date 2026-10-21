@@ -241,7 +241,7 @@ def test_the_answer_records_the_prompt_version():
 
     answer = ask("When is rent due?", index_with_lease(), llm)
 
-    assert answer.prompt_version == "grounded-v3"
+    assert answer.prompt_version == "grounded-v4"
 
 
 @pytest.mark.spec("GEN-014")
@@ -342,3 +342,22 @@ def test_each_stage_records_its_model_latency_and_whether_it_came_from_a_cache()
     stage = answer.usage.stages[0]
     assert stage.latency_ms >= 0.0
     assert stage.cached is False
+
+
+@pytest.mark.spec("GEN-010")
+def test_each_evidence_shows_its_section_which_carries_conditions():
+    index = InMemoryIndex()
+    index.add(
+        Chunk(
+            source="deposit.md",
+            text=LEASE,
+            span=Span(0, len(LEASE)),
+            section_path=("Furnished", "Inventory matches"),
+        )
+    )
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
+
+    ask("When is rent due?", index, llm)
+
+    assert 'section="Furnished > Inventory matches"' in llm.requests[0].prompt
+    assert "keep the conditions" in llm.requests[0].system

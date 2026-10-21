@@ -53,7 +53,7 @@ def test_an_end_to_end_run_scores_answers_retrieval_and_operations(dataset: Path
 
     assert run.settings["mode"] == "end-to-end"
     assert run.settings["model"] == "ollama:test"
-    assert run.settings["prompt_version"] == "grounded-v3"
+    assert run.settings["prompt_version"] == "grounded-v4"
     assert run.per_case["rent-due"]["citation_recall"] == 1.0
     assert run.per_case["rent-due"]["hit_rate@1"] == 1.0
     assert run.per_case["parking"]["false_answer_rate"] == 0.0

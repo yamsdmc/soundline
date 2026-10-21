@@ -67,7 +67,8 @@ def grounded_request(
     history: Sequence[Turn] = (),
 ) -> GenerationRequest:
     blocks = "\n".join(
-        f'<evidence id="{evidence_id}" source="{_attribute(chunk.source)}">\n'
+        f'<evidence id="{evidence_id}" source="{_attribute(chunk.source)}"'
+        f"{_section(chunk.section_path)}>\n"
         f"{_escaped(chunk.text)}\n</evidence>"
         for evidence_id, chunk in evidence.items()
     )
@@ -139,6 +140,10 @@ def _text(directory: Traversable, name: str) -> str:
 _TAGS = ("evidence", "history", "turn", "claim", "quote")
 
 
+def _section(path: Sequence[str]) -> str:
+    return f' section="{_attribute(" > ".join(path))}"' if path else ""
+
+
 def _attribute(value: str) -> str:
     """Source names and section titles come from documents: they cannot leave their
     attribute (SEC-001)."""
@@ -152,6 +157,6 @@ def _escaped(text: str) -> str:
     return text
 
 
-DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v3")
+DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v4")
 CONDENSE_PROMPT = PromptTemplate.packaged("condense-v1", CONDENSE_PLACEHOLDERS)
 FAITHFULNESS_PROMPT = PromptTemplate.packaged("faithfulness-v1", FAITHFULNESS_PLACEHOLDERS)

@@ -15,7 +15,7 @@ def write_prompt(directory: Path, user: str) -> Path:
 
 @pytest.mark.spec("GEN-014")
 def test_the_packaged_prompt_is_versioned():
-    assert DEFAULT_PROMPT.version == "grounded-v3"
+    assert DEFAULT_PROMPT.version == "grounded-v4"
 
 
 @pytest.mark.spec("GEN-014")

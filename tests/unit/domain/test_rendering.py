@@ -46,9 +46,9 @@ def test_a_claim_without_closing_punctuation_ends_with_its_marker():
 
 @pytest.mark.spec("GEN-014")
 def test_the_json_form_of_an_answer_carries_its_prompt_version():
-    answer = Answer(AnswerStatus.ABSTAINED, prompt_version="grounded-v3")
+    answer = Answer(AnswerStatus.ABSTAINED, prompt_version="grounded-v4")
 
-    assert answer_to_dict(answer)["prompt_version"] == "grounded-v3"
+    assert answer_to_dict(answer)["prompt_version"] == "grounded-v4"
 
 
 @pytest.mark.spec("GEN-070")
