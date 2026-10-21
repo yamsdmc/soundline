@@ -39,6 +39,9 @@ Issues = "https://github.com/yamsdmc/soundline/issues"
 anthropic = [
     "anthropic>=1.0",
 ]
+openai = [
+    "openai>=1.50",
+]
 
 [dependency-groups]
 dev = [

@@ -1,5 +1,6 @@
 """The public Python API, and the composition root that wires adapters to ports (ARC-006)."""
 
+import os
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -229,7 +230,26 @@ def llm_from_spec(spec: str) -> LanguageModel:
                 'the Anthropic provider needs: pip install "soundline[anthropic]"'
             ) from error
         return AnthropicLanguageModel(model)
-    raise ConfigurationError(f"unknown language model {spec!r}; use 'anthropic:<model>'")
+    if provider in ("openai", "ollama") and model:
+        try:
+            from soundline.adapters.llms.openai_compatible import (  # noqa: PLC0415
+                OpenAICompatibleLanguageModel,
+            )
+        except ImportError as error:  # ARC-012, CFG-014
+            raise ConfigurationError(
+                'OpenAI-compatible providers need: pip install "soundline[openai]"'
+            ) from error
+        if provider == "openai":
+            return OpenAICompatibleLanguageModel(model)
+        host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+        # Local models: deterministic sampling, and the lenient parser for loose JSON (CFG-013).
+        import openai  # noqa: PLC0415
+
+        client = openai.OpenAI(base_url=f"{host}/v1", api_key="ollama")
+        return OpenAICompatibleLanguageModel(model, client, temperature=0.0)
+    raise ConfigurationError(
+        f"unknown language model {spec!r}; use anthropic:<model>, openai:<model> or ollama:<model>"
+    )
 
 
 def _default_embedder() -> Embedder:

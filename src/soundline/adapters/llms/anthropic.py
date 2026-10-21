@@ -2,42 +2,9 @@
 
 import anthropic
 
+from soundline.application.answer_format import ANSWER_SCHEMA
 from soundline.application.ports import GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
-
-# The answer contract of docs/spec/05-generation.md as a strict JSON schema: both fields are
-# always present, `insufficient_evidence` is null when the model answers.
-ANSWER_SCHEMA: dict[str, object] = {
-    "type": "object",
-    "properties": {
-        "claims": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string"},
-                    "citations": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "evidence_id": {"type": "string"},
-                                "quote": {"type": "string"},
-                            },
-                            "required": ["evidence_id", "quote"],
-                            "additionalProperties": False,
-                        },
-                    },
-                },
-                "required": ["text", "citations"],
-                "additionalProperties": False,
-            },
-        },
-        "insufficient_evidence": {"type": ["string", "null"]},
-    },
-    "required": ["claims", "insufficient_evidence"],
-    "additionalProperties": False,
-}
 
 
 class AnthropicLanguageModel:
