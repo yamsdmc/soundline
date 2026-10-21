@@ -111,6 +111,27 @@ def test_the_model_can_declare_the_evidence_insufficient():
     assert answer.abstention_message == "The lease says nothing about parking."
 
 
+@pytest.mark.spec("GEN-021", "GEN-023")
+@pytest.mark.parametrize("reason", ["", "  ", "The lease is unclear."])
+def test_claims_take_precedence_over_a_blank_or_spurious_insufficient_evidence(reason: str):
+    # Small local models fill the field with "" instead of null while answering.
+    output = {**citing("E1", "Rent is due on the 5th"), "insufficient_evidence": reason}
+    llm = ScriptedLanguageModel(output)
+
+    answer = ask("When is rent due?", index_with_lease(), llm)
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+@pytest.mark.spec("GEN-021", "GEN-023")
+def test_a_blank_insufficient_evidence_without_claims_is_still_an_abstention():
+    llm = ScriptedLanguageModel({"claims": [], "insufficient_evidence": ""})
+
+    answer = ask("Is parking free?", index_with_lease(), llm)
+
+    assert answer.abstention_reason is AbstentionReason.MODEL_INSUFFICIENT_EVIDENCE
+
+
 @pytest.mark.spec("GEN-020")
 def test_invalid_output_is_retried_once_with_the_validation_error():
     llm = ScriptedLanguageModel(

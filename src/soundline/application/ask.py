@@ -120,9 +120,11 @@ def _parse(raw: str) -> _ModelOutput:
     if not isinstance(data, Mapping):
         raise _InvalidOutputError("the output must be a JSON object")
     output = cast("Mapping[str, object]", data)
-    if isinstance(output.get("insufficient_evidence"), str):
-        return _ModelOutput([], str(output["insufficient_evidence"]), lenient)
     claims = output.get("claims")
+    # Claims win over the declaration: small models often fill it with "" while answering,
+    # and the claims are verified anyway (GEN-021, GEN-023).
+    if isinstance(output.get("insufficient_evidence"), str) and not claims:
+        return _ModelOutput([], str(output["insufficient_evidence"]), lenient)
     if not isinstance(claims, list):
         raise _InvalidOutputError("'claims' must be a list of claims")
     return _ModelOutput([_claim(c) for c in cast("list[object]", claims)], None, lenient)
