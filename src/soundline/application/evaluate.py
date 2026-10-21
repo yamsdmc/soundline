@@ -30,38 +30,51 @@ def resolve_dataset(
     A quote's `source` names a document by its source or by its file name. Quotes match
     regardless of case and whitespace, and resolve to the exact span of the source text.
     Every problem is reported at once, with the closest sentence as a hint. A sentence that a
-    document repeats (across variants of a page) resolves to every occurrence.
+    document repeats (across variants of a page) resolves to every occurrence, and so do a
+    quote's alternatives: covering any occurrence covers the quote.
     """
     sources = documents.sources()
     resolved: dict[str, list[tuple[Located, ...]]] = {}
     problems: list[str] = []
     for case in dataset.cases:
-        located: list[tuple[Located, ...]] = []
-        for relevant in case.relevant:
-            matches = [
-                s for s in sources if s == relevant.source or _file_name(s) == relevant.source
-            ]
-            if not matches and allow_missing_sources:
-                # The answer is in a document the index lacks: no hit can cover it (recall 0).
-                located.append(
-                    (Located(f"missing:{relevant.source}", Span(0, len(relevant.quote))),)
+        resolved[case.id] = [
+            tuple(
+                occurrence
+                for variant in (relevant, *relevant.alternatives)
+                for occurrence in _locate(
+                    case.id, variant, sources, documents, allow_missing_sources, problems
                 )
-                continue
-            if len(matches) != 1:
-                reason = "no indexed document matches" if not matches else "several documents match"
-                problems.append(f"case {case.id!r}: {reason} {relevant.source!r}")
-                continue
-            document = documents.get(matches[0])
-            text = document.text if document else ""
-            spans = _find(relevant.quote, text)
-            if not spans:
-                problems.append(_not_found(case.id, relevant, text))
-            else:
-                located.append(tuple(Located(matches[0], span) for span in spans))
-        resolved[case.id] = located
+            )
+            for relevant in case.relevant
+        ]
     if problems:
         raise DatasetError("\n".join(problems))
     return resolved
+
+
+def _locate(  # noqa: PLR0913, PLR0917  # one quote, with what resolving it needs
+    case_id: str,
+    relevant: RelevantQuote,
+    sources: list[str],
+    documents: DocumentStore,
+    allow_missing_sources: bool,
+    problems: list[str],
+) -> list[Located]:
+    """Every occurrence of one excerpt; problems are collected, not raised one by one."""
+    matches = [s for s in sources if s == relevant.source or _file_name(s) == relevant.source]
+    if not matches and allow_missing_sources:
+        # The answer is in a document the index lacks: no hit can cover it (recall 0).
+        return [Located(f"missing:{relevant.source}", Span(0, len(relevant.quote)))]
+    if len(matches) != 1:
+        reason = "no indexed document matches" if not matches else "several documents match"
+        problems.append(f"case {case_id!r}: {reason} {relevant.source!r}")
+        return []
+    document = documents.get(matches[0])
+    text = document.text if document else ""
+    spans = _find(relevant.quote, text)
+    if not spans:
+        problems.append(_not_found(case_id, relevant, text))
+    return [Located(matches[0], span) for span in spans]
 
 
 def _find(quote: str, text: str) -> list[Span]:

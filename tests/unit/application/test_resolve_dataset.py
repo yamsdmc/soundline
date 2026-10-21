@@ -71,3 +71,25 @@ def test_a_quote_repeated_in_a_document_resolves_to_every_occurrence():
     resolved = resolve_dataset(dataset(("lease.md", "return within 1 month")), documents)
 
     assert resolved["c1"] == [(Located(URI, Span(13, 34)), Located(URI, Span(48, 69)))]
+
+
+@pytest.mark.spec("EVL-001", "EVL-002")
+def test_alternatives_resolve_into_one_quote_with_every_occurrence():
+    documents = store()
+    other = "file:///home/me/docs/rules.md"
+    documents.save(StoredDocument(other, "r2", "Rules. Rent is due on the 5th."))
+    case = {
+        "id": "c1",
+        "question": "?",
+        "relevant": [
+            {
+                "source": "lease.md",
+                "quote": "Rent is due on the 5th",
+                "or": [{"source": "rules.md", "quote": "Rent is due on the 5th"}],
+            }
+        ],
+    }
+
+    resolved = resolve_dataset(parse_dataset([json.dumps(case)]), documents)
+
+    assert resolved["c1"] == [(Located(URI, Span(0, 22)), Located(other, Span(7, 29)))]

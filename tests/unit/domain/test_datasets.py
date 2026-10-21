@@ -58,3 +58,34 @@ def test_malformed_cases_are_rejected_with_their_line_number(bad: str, message: 
 
 def test_blank_lines_are_ignored():
     assert len(parse_dataset(["", line(), "   "]).cases) == 1
+
+
+@pytest.mark.spec("EVL-001")
+def test_a_relevant_quote_may_list_equivalent_alternatives():
+    case = {
+        "id": "c1",
+        "question": "?",
+        "relevant": [
+            {
+                "source": "a.md",
+                "quote": "Rent is due.",
+                "or": [{"source": "b.md", "quote": "Pay rent."}],
+            }
+        ],
+    }
+
+    (relevant,) = parse_dataset([json.dumps(case)]).cases[0].relevant
+
+    assert relevant.alternatives == (RelevantQuote("b.md", "Pay rent."),)
+
+
+@pytest.mark.spec("EVL-001")
+def test_an_alternative_needs_a_source_and_a_quote_too():
+    case: dict[str, object] = {
+        "id": "c1",
+        "question": "?",
+        "relevant": [{"source": "a.md", "quote": "x", "or": [{}]}],
+    }
+
+    with pytest.raises(DatasetError, match="line 1"):
+        parse_dataset([json.dumps(case)])

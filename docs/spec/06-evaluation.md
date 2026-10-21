@@ -30,6 +30,7 @@ A dataset is a **JSONL** file (one case per line) with an optional header file `
 ```
 
 - **EVL-001** Relevance MUST be labeled by **quote** (source + exact excerpt), not by chunk ID. This keeps datasets valid across chunking, enrichment and embedding changes.
+  A relevant quote MAY list equivalent excerpts under `"or"` (the same rule in another document, or in another variant of a page): `{"source": "a.html", "quote": "…", "or": [{"source": "b.html", "quote": "…"}]}`. Covering any of them covers the quote.
 - **EVL-002** Loading a dataset MUST validate every case. In particular, each relevant quote MUST be found in the indexed corpus, using the same matching ladder as citation verification (GEN chapter). Unfound quotes are reported as dataset errors, with the closest match as a hint.
   A quote that a document contains several times (a sentence repeated across variants of a page) resolves to **every** occurrence, and a hit covering any of them covers the quote.
   > Refined in M4: the first-occurrence rule made correct top-ranked hits count as misses on real pages; found with the `logement-fr` benchmark.

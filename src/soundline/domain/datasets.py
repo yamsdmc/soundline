@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import cast
 
 from soundline.domain.errors import SoundlineError
@@ -18,6 +18,9 @@ class RelevantQuote:
 
     source: str
     quote: str
+    alternatives: tuple["RelevantQuote", ...] = ()
+    """Equivalent excerpts (the same rule in another document or variant of a page):
+    covering any of them covers this quote (EVL-001)."""
 
 
 @dataclass(frozen=True)
@@ -94,13 +97,25 @@ def _relevant(value: object, number: int) -> tuple[RelevantQuote, ...]:
         raise DatasetError(f"line {number}: 'relevant' must be a list")
     quotes: list[RelevantQuote] = []
     for item in cast("list[object]", value):
-        entry: Mapping[str, object] = (
-            cast("Mapping[str, object]", item) if isinstance(item, Mapping) else {}
+        entry = _mapping(item)
+        alternatives = entry.get("or", [])
+        if not isinstance(alternatives, list):
+            raise DatasetError(f"line {number}: 'or' must be a list of relevant quotes")
+        others = tuple(
+            _quote(_mapping(other), number) for other in cast("list[object]", alternatives)
         )
-        source, quote = entry.get("source"), entry.get("quote")
-        if not (isinstance(source, str) and source and isinstance(quote, str) and quote.strip()):
-            raise DatasetError(
-                f"line {number}: each relevant quote needs a non-empty 'source' and 'quote'"
-            )
-        quotes.append(RelevantQuote(source, quote))
+        quotes.append(replace(_quote(entry, number), alternatives=others))
     return tuple(quotes)
+
+
+def _mapping(item: object) -> Mapping[str, object]:
+    return cast("Mapping[str, object]", item) if isinstance(item, Mapping) else {}
+
+
+def _quote(entry: Mapping[str, object], number: int) -> RelevantQuote:
+    source, quote = entry.get("source"), entry.get("quote")
+    if not (isinstance(source, str) and source and isinstance(quote, str) and quote.strip()):
+        raise DatasetError(
+            f"line {number}: each relevant quote needs a non-empty 'source' and 'quote'"
+        )
+    return RelevantQuote(source, quote)
