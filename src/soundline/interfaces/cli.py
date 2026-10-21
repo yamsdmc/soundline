@@ -6,6 +6,7 @@ import sys
 import webbrowser
 from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn, cast
@@ -13,8 +14,9 @@ from typing import TYPE_CHECKING, Annotated, NoReturn, cast
 import typer
 
 from soundline import Soundline
-from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec, llm_from_spec
+from soundline.api import embedder_from_spec, llm_from_spec
 from soundline.application.ask import GenerationSettings
+from soundline.application.configuration import Configuration, find_configuration_file
 from soundline.application.ingest import IngestionReport, IngestionStatus
 from soundline.application.prompts import PromptTemplate
 from soundline.domain.answers import Answer, answer_to_dict
@@ -49,19 +51,31 @@ INTERNAL_ERROR = 10
 if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
+    from soundline.application.ports import LanguageModel
+
 app = typer.Typer(no_args_is_help=True, help="The eval-first RAG engine.")
 inspect_app = typer.Typer(no_args_is_help=True, help="Inspect index internals.")
 app.add_typer(inspect_app, name="inspect")
 eval_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality.")
 app.add_typer(eval_app, name="eval")
+config_app = typer.Typer(no_args_is_help=True, help="The configuration (soundline.toml).")
+app.add_typer(config_app, name="config")
 CHECK_FAILED = 1
 
 JsonOption = Annotated[bool, typer.Option("--json", help="Print one JSON document on stdout.")]
 Paths = Annotated[list[Path], typer.Argument(help="Files and directories.")]
 
 
+def _configuration() -> Configuration:
+    """Defaults, then soundline.toml, then the environment (CFG-001, CFG-002)."""
+    try:
+        return Configuration.load(find_configuration_file(Path.cwd(), os.environ), os.environ)
+    except ConfigurationError as error:
+        _fail(error, CONFIGURATION_ERROR)
+
+
 def _home() -> Path:
-    return Path(os.environ.get("SOUNDLINE_HOME", ".soundline"))
+    return Path(_configuration().get("store.path"))
 
 
 def open_in_browser(url: str) -> None:
@@ -70,19 +84,24 @@ def open_in_browser(url: str) -> None:
 
 @contextmanager
 def _soundline() -> Generator[Soundline]:
-    home = _home()
-    embedder = os.environ.get("SOUNDLINE_EMBEDDER", DEFAULT_EMBEDDER)
-    llm_spec = os.environ.get("SOUNDLINE_LLM")
+    config = _configuration()
     try:
+        llm_spec = config.get("generation.model")
         llm = llm_from_spec(llm_spec) if llm_spec else None
-        prompt_dir = os.environ.get("SOUNDLINE_PROMPT")  # GEN-014
-        generation = (
-            GenerationSettings(prompt=PromptTemplate.from_directory(prompt_dir))
-            if prompt_dir
-            else None
+        prompt_dir = config.get("generation.prompt")  # GEN-014
+        generation = GenerationSettings(
+            k=config.get("retrieval.k"),
+            history_budget_tokens=config.get("generation.history_budget_tokens"),
+            instructions=config.get("generation.instructions"),  # GEN-016
+            prices=config.prices,  # GEN-070
         )
+        if prompt_dir:
+            generation = replace(generation, prompt=PromptTemplate.from_directory(prompt_dir))
         with Soundline.open(
-            home, llm=llm, embedder=embedder_from_spec(embedder), generation=generation
+            config.get("store.path"),
+            llm=llm,
+            embedder=embedder_from_spec(config.get("embedding.model")),
+            generation=generation,
         ) as soundline:
             yield soundline
     except (InvalidFilterError, DatasetError, RunMismatchError) as error:
@@ -93,6 +112,17 @@ def _soundline() -> Generator[Soundline]:
         _fail(error, PROVIDER_UNAVAILABLE)
     except GenerationError as error:
         _fail(error, INTERNAL_ERROR)
+
+
+def _judge(spec: str | None) -> "LanguageModel | None":
+    """The judge named on the command line, else the configured one (CFG-001)."""
+    spec = spec or _configuration().get("evaluation.judge_model")
+    return llm_from_spec(spec) if spec else None
+
+
+@config_app.command("show", help="The effective configuration, with the source of each value.")
+def config_show() -> None:
+    typer.echo(_configuration().describe())  # CFG-005
 
 
 def _fail(error: SoundlineError, exit_code: int) -> NoReturn:
@@ -324,7 +354,7 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
             allow_missing_sources=allow_missing_sources,
             retrieval_only=retrieval_only,
             no_cache=no_cache,
-            judge=llm_from_spec(judge) if judge else None,
+            judge=_judge(judge),
             without_verification=without_verification,
         )
     if as_json:
@@ -377,11 +407,22 @@ def eval_labels(
 @eval_app.command("calibrate", help="Measure a judge's agreement with human labels (EVL-043).")
 def eval_calibrate(
     labels: Path,
-    judge: Annotated[str, typer.Option(help="Judge model, e.g. anthropic:claude-opus-5-5.")],
+    judge: Annotated[
+        str | None,
+        typer.Option(
+            help="Judge model, e.g. anthropic:claude-opus-5-5 (default: evaluation.judge_model)."
+        ),
+    ] = None,
     no_cache: Annotated[bool, typer.Option(help="Call the judge again.")] = False,
 ) -> None:
     with _soundline() as soundline:
-        report = soundline.calibrate(labels, llm_from_spec(judge), no_cache=no_cache)
+        judge_llm = _judge(judge)
+        if judge_llm is None:
+            _fail(
+                ConfigurationError("no judge: pass --judge or set evaluation.judge_model"),
+                USAGE_ERROR,
+            )
+        report = soundline.calibrate(labels, judge_llm, no_cache=no_cache)
     result = report.agreement
     typer.echo(f"judge {report.judge_model} ({report.judge_version}) on {result.cases} labels")
     typer.echo(f"  accuracy {result.accuracy:.3f}, Cohen's kappa {result.kappa:.3f}")

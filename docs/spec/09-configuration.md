@@ -15,6 +15,8 @@ Make Soundline work **with zero configuration** for search, and make every behav
 
 ## Reference configuration
 
+> **Implemented so far (M5):** `store.path` (the directory holding `index.db`, eval runs and the model cache), `embedding.model`, `generation.model`, `generation.prompt`, `generation.instructions` (GEN-016), `generation.history_budget_tokens`, `retrieval.k`, `evaluation.judge_model` and `[pricing]`; environment variables `SOUNDLINE_<SECTION>__<KEY>`, plus the older `SOUNDLINE_HOME`, `SOUNDLINE_EMBEDDER`, `SOUNDLINE_LLM` and `SOUNDLINE_PROMPT`; `soundline config show`. Any other key is rejected as unknown until Soundline acts on it: a setting that is accepted but ignored would be worse than an error.
+
 ```toml
 # soundline.toml
 

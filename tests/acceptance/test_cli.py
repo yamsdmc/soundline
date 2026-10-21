@@ -377,3 +377,53 @@ def test_mcp_serves_the_index_over_stdio_with_a_corpus_description(
 
     assert result.exit_code == 0, result.output
     assert len(served) == 1
+
+
+@pytest.mark.spec("CFG-001", "CFG-002", "GEN-016")
+def test_soundline_toml_configures_the_cli_and_the_environment_overrides_it(
+    run: Run, docs: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    scripted = ScriptedLanguageModel(
+        {
+            "claims": [
+                {
+                    "text": "Rent is due on the 5th.",
+                    "citations": [{"evidence_id": "E1", "quote": "Rent is due on the 5th"}],
+                }
+            ],
+            "insufficient_evidence": None,
+        }
+    )
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return scripted
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "soundline.toml").write_text(
+        '[generation]\nmodel = "scripted:test"\ninstructions = "Be brief."\n\n[retrieval]\nk = 1\n',
+        encoding="utf-8",
+    )
+    run("ingest", str(docs))
+
+    result = run("ask", "rent due 5th")
+
+    assert result.exit_code == 0, result.output
+    assert "Be brief." in scripted.requests[0].system
+    assert scripted.requests[0].prompt.count("<evidence ") == 1  # retrieval.k
+    shown = run("config", "show").stdout.splitlines()
+    assert "retrieval.k = 1  # " + str(tmp_path / "soundline.toml") in shown
+    assert any(line.endswith("# SOUNDLINE_HOME") for line in shown)
+
+
+@pytest.mark.spec("CFG-003")
+def test_a_typo_in_soundline_toml_is_a_configuration_error(
+    run: Run, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "soundline.toml").write_text("[retrieval]\nkk = 3\n", encoding="utf-8")
+
+    result = run("config", "show")
+
+    assert result.exit_code == 3
+    assert "unknown key 'retrieval.kk'; did you mean 'retrieval.k'?" in result.stderr
