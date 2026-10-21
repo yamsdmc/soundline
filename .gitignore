@@ -11,3 +11,6 @@ build/
 htmlcov/
 .soundline/
 .DS_Store
+
+# Approval tests: text awaiting review
+tests/approvals/*.received.txt
