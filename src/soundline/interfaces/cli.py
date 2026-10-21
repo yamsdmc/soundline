@@ -7,7 +7,7 @@ import webbrowser
 from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Annotated, NoReturn, cast
 
 import typer
@@ -17,7 +17,7 @@ from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec, llm_from_spec
 from soundline.application.ask import GenerationSettings
 from soundline.application.ingest import IngestionReport, IngestionStatus
 from soundline.application.prompts import PromptTemplate
-from soundline.domain.answers import Answer, AnswerStatus, answer_to_dict
+from soundline.domain.answers import Answer, answer_to_dict
 from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import (
     ConfigurationError,
@@ -37,6 +37,7 @@ from soundline.domain.runs import (
 )
 from soundline.domain.tracing import render_tree
 from soundline.domain.usage import Usage
+from soundline.interfaces.answer_text import answer_text
 
 # Exit codes (CLI-001)
 USAGE_ERROR = 2
@@ -243,22 +244,7 @@ def _read_question() -> str | None:
 
 
 def _print_answer(answer: Answer) -> None:
-    if answer.status is AnswerStatus.ABSTAINED:
-        reason = answer.abstention_reason.value if answer.abstention_reason else "unknown"
-        typer.echo(f"No answer ({reason}). {answer.abstention_message or ''}".rstrip())
-        return
-    typer.echo(answer.text)
-    typer.echo()
-    for number, citation in enumerate(answer.citations, 1):
-        where = " > ".join(citation.section_path)
-        label = PurePosixPath(citation.source).name + (f", {where}" if where else "")
-        marker = " (approximate)" if citation.approximate else ""
-        typer.echo(f'[{number}] {label}: "{citation.quote}"{marker}')  # GEN-042
-    if answer.dropped_claims:
-        typer.echo()
-        typer.echo(f"{answer.status.value}: unsupported claims were removed:")
-        for claim in answer.dropped_claims:
-            typer.echo(f"  - {claim}")
+    typer.echo(answer_text(answer))
 
 
 def _usage_line(usage: Usage) -> str:
