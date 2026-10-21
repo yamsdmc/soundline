@@ -114,6 +114,8 @@ class Generator:
     """Recorded in the run: model ID, prompt version (EVL-060)."""
     judge: FaithfulnessJudge | None = None
     """Optional, enabled explicitly (EVL-021)."""
+    judge_calibration: str = "uncalibrated"
+    """Shown next to judge metrics (EVL-043)."""
 
 
 _OPERATIONS = (
@@ -177,7 +179,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             mode["judge"] = {
                 "model": generator.judge.model_id,
                 "version": generator.judge.version,
-                "calibration": "uncalibrated",  # EVL-043: until `eval calibrate` exists
+                "calibration": generator.judge_calibration,  # EVL-043
             }
     return EvalRun(
         name=name,

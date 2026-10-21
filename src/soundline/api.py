@@ -9,6 +9,7 @@ from typing import Self
 
 from soundline.application.ask import GenerationSettings, ask, ask_stream
 from soundline.application.cached_model import CachedLanguageModel
+from soundline.application.calibrate import CalibrationReport, calibrate, labels_from_run
 from soundline.application.diagnostics import Check, diagnose
 from soundline.application.evaluate import DatasetFile, EvalSettings, Generator, run_eval
 from soundline.application.hybrid_retriever import HybridRetriever
@@ -24,7 +25,9 @@ from soundline.application.ports import (
     RunStore,
     SourceReader,
 )
+from soundline.application.prompts import FAITHFULNESS_PROMPT
 from soundline.domain.answers import Answer, history_text
+from soundline.domain.calibration import Calibration, parse_labels
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.conversation import Turn
 from soundline.domain.datasets import DatasetError
@@ -258,6 +261,7 @@ class Soundline:
                     "k": self._generation.k,
                 },
                 FaithfulnessJudge(judge) if judge else None,
+                self._calibration_of(judge),
             )
         run = run_eval(
             name or datetime.now(UTC).strftime("run-%Y%m%d-%H%M%S"),
@@ -269,6 +273,38 @@ class Soundline:
         )
         self._runs.save(run)
         return run
+
+    def export_labels(self, run: str) -> list[dict[str, object]]:
+        """The claims of an end-to-end run as labels to review for judge calibration; the
+        run's judge verdicts are unreviewed suggestions (EVL-043)."""
+        return labels_from_run(self.load_run(run))
+
+    def calibrate(
+        self, labels: str | Path, judge: LanguageModel, *, no_cache: bool = False
+    ) -> CalibrationReport:
+        """Measures the judge's agreement with human labels and stores it, so later runs
+        show it next to judge metrics (EVL-043)."""
+        if not Path(labels).is_file():
+            raise DatasetError(f"labels file not found: {labels}")
+        parsed = parse_labels(Path(labels).read_text(encoding="utf-8").splitlines())
+        model = judge if no_cache else CachedLanguageModel(judge, self._generation_cache)
+        report = calibrate(parsed, FaithfulnessJudge(model))
+        self._runs.save_calibration(
+            Calibration(
+                report.judge_model,
+                report.judge_version,
+                report.agreement,
+                report.unreviewed,
+                datetime.now(UTC).isoformat(timespec="seconds"),
+            )
+        )
+        return report
+
+    def _calibration_of(self, judge: LanguageModel | None) -> str:
+        if judge is None:
+            return "uncalibrated"
+        stored = self._runs.calibration(judge.model_id, FAITHFULNESS_PROMPT.version)
+        return stored.describe() if stored else "uncalibrated"
 
     def load_run(self, name_or_path: str) -> EvalRun:
         return self._runs.load(name_or_path)

@@ -238,3 +238,48 @@ def test_the_report_names_the_judge_its_calibration_and_the_warnings(
 
     assert "judge scripted:test (faithfulness-v2, uncalibrated)" in result.stdout
     assert "warning: the judge is the same model" in result.stdout
+
+
+def answering_model() -> ScriptedLanguageModel:
+    answers: list[dict[str, object]] = [
+        {
+            "claims": [
+                {"text": sentence, "citations": [{"evidence_id": "E1", "quote": sentence[:-1]}]}
+            ],
+            "insufficient_evidence": None,
+        }
+        for _, sentence in TOPICS
+    ]
+    return ScriptedLanguageModel(*answers, model_id="scripted:generator")
+
+
+@pytest.mark.spec("EVL-043")
+def test_labels_exported_from_a_judged_run_calibrate_the_judge_for_later_runs(
+    tmp_path: Path, corpus: Path, dataset: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run = runner_for(tmp_path / "home", monkeypatch)
+    run("ingest", str(corpus))
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:generator")
+    verdict: dict[str, object] = {"rationale": "states it", "entailed": True}
+    models = {
+        "scripted:generator": answering_model(),
+        "scripted:judge": ScriptedLanguageModel(*[verdict] * 50, model_id="scripted:judge"),
+    }
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return models[spec]
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    run("eval", "run", str(dataset), "--name", "judged", "--judge", "scripted:judge")
+    labels = tmp_path / "labels.jsonl"
+
+    exported = run("eval", "labels", "judged", "--output", str(labels))
+    calibrated = run("eval", "calibrate", str(labels), "--judge", "scripted:judge")
+    later = run("eval", "run", str(dataset), "--judge", "scripted:judge")
+
+    assert exported.exit_code == 0, exported.output
+    assert len(labels.read_text().splitlines()) == len(TOPICS)
+    assert calibrated.exit_code == 0, calibrated.output
+    assert "accuracy 1.000" in calibrated.stdout
+    assert f"{len(TOPICS)} labels not reviewed" in calibrated.stdout
+    assert "calibrated: kappa" in later.stdout

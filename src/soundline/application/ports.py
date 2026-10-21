@@ -5,6 +5,7 @@ from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from soundline.domain.calibration import Calibration
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import Filter
 from soundline.domain.manifest import Manifest
@@ -161,6 +162,12 @@ class RunStore(Protocol):
         ...
 
     def load(self, name_or_path: str) -> EvalRun: ...
+
+    def save_calibration(self, calibration: Calibration) -> None:
+        """Replaces any calibration of the same judge model and version (EVL-043)."""
+        ...
+
+    def calibration(self, judge_model: str, judge_version: str) -> Calibration | None: ...
 
 
 class ManifestStore(Protocol):

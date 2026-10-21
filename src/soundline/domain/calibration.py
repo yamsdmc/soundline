@@ -2,8 +2,8 @@
 
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from typing import cast
+from dataclasses import asdict, dataclass
+from typing import Any, cast
 
 from soundline.domain.datasets import DatasetError
 
@@ -96,3 +96,34 @@ def _quote(value: object, fail: Callable[[str], DatasetError]) -> QuoteLabel:
     if not isinstance(source, str) or not isinstance(quote, str) or not isinstance(section, list):
         raise fail("each quote needs 'source', 'quote' and a 'section' list")
     return source, tuple(str(part) for part in cast("list[object]", section)), quote
+
+
+@dataclass(frozen=True)
+class Calibration:
+    """The stored outcome of calibrating one judge version on one model (EVL-043)."""
+
+    judge_model: str
+    judge_version: str
+    agreement: Agreement
+    unreviewed: int
+    created_at: str
+
+    def describe(self) -> str:
+        provisional = f", {self.unreviewed} unreviewed" if self.unreviewed else ""
+        return (
+            f"calibrated: kappa {self.agreement.kappa:.2f}, accuracy"
+            f" {self.agreement.accuracy:.2f} on {self.agreement.cases} labels{provisional}"
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "Calibration":
+        return cls(
+            data["judge_model"],
+            data["judge_version"],
+            Agreement(**data["agreement"]),
+            data["unreviewed"],
+            data["created_at"],
+        )

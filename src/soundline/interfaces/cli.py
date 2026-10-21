@@ -332,6 +332,51 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
             typer.echo(f"  {metric:<{width}} {values}")
 
 
+@eval_app.command(
+    "labels", help="Export a judged run's claims as labels to review for calibration."
+)
+def eval_labels(
+    run: str,
+    output: Annotated[
+        Path | None, typer.Option(help="JSONL file to write (default: stdout).")
+    ] = None,
+) -> None:
+    with _soundline() as soundline:
+        labels = soundline.export_labels(run)
+    lines = "".join(json.dumps(label, ensure_ascii=False) + "\n" for label in labels)
+    if output is None:
+        typer.echo(lines, nl=False)
+        return
+    output.write_text(lines, encoding="utf-8")
+    typer.echo(f"{len(labels)} labels written to {output}: set 'entailed', then 'reviewed': true")
+
+
+@eval_app.command("calibrate", help="Measure a judge's agreement with human labels (EVL-043).")
+def eval_calibrate(
+    labels: Path,
+    judge: Annotated[str, typer.Option(help="Judge model, e.g. anthropic:claude-opus-5-5.")],
+    no_cache: Annotated[bool, typer.Option(help="Call the judge again.")] = False,
+) -> None:
+    with _soundline() as soundline:
+        report = soundline.calibrate(labels, llm_from_spec(judge), no_cache=no_cache)
+    result = report.agreement
+    typer.echo(f"judge {report.judge_model} ({report.judge_version}) on {result.cases} labels")
+    typer.echo(f"  accuracy {result.accuracy:.3f}, Cohen's kappa {result.kappa:.3f}")
+    typer.echo(
+        f"  accepts: {result.true_accepts} right, {result.false_accepts} wrong;"
+        f" rejects: {result.true_rejects} right, {result.false_rejects} wrong"
+    )
+    if report.unreviewed:
+        typer.echo(f"warning: {report.unreviewed} labels not reviewed by a person: provisional")
+    if report.unreadable:
+        typer.echo(f"warning: {report.unreadable} unreadable verdicts left out")
+    for disagreement in report.disagreements:
+        verdict = "accepts" if disagreement.judgment.entailed else "rejects"
+        typer.echo(f"\n{disagreement.label.id}: the judge {verdict}, the label does not")
+        typer.echo(f"  claim: {disagreement.label.claim}")
+        typer.echo(f"  judge: {disagreement.judgment.rationale}")
+
+
 @eval_app.command("compare", help="Paired comparison of two runs on the same dataset.")
 def eval_compare(
     baseline: str,
