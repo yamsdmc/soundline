@@ -10,9 +10,61 @@ from itertools import accumulate
 from soundline.domain.documents import Block, ParsedDocument, assemble
 from soundline.domain.normalization import NormalizedText, normalize
 
-_NOT_CONTENT = {"script", "style", "nav", "footer", "aside", "noscript", "template", "svg", "head"}
+_NOT_CONTENT = {
+    "script",
+    "style",
+    "nav",
+    "footer",
+    "aside",
+    "noscript",
+    "template",
+    "svg",
+    "head",
+    "form",
+    "button",
+    "select",
+    "textarea",
+    "dialog",
+}
+# ARIA roles of interface chrome rather than content.
+_CHROME_ROLES = {
+    "alert",
+    "alertdialog",
+    "dialog",
+    "status",
+    "navigation",
+    "banner",
+    "contentinfo",
+    "search",
+    "menu",
+    "menubar",
+    "toolbar",
+    "tooltip",
+}
+_VOID = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "source",
+    "track",
+    "wbr",
+}
 _HEADINGS = {f"h{level}": level for level in range(1, 7)}
 _PARAGRAPHS = {"p", "blockquote", "dd", "dt", "figcaption", "caption"}
+# Tags that start a block: (kind, level).
+_BLOCKS: dict[str, tuple[str, int]] = {
+    **{tag: ("heading", level) for tag, level in _HEADINGS.items()},
+    **dict.fromkeys(_PARAGRAPHS, ("paragraph", 0)),
+    "li": ("list_item", 0),
+    "pre": ("code", 0),
+}
 _CONTAINERS = {"div", "section", "article", "main", "body", "header", "ul", "ol", "br", "hr"}
 
 type _Chars = list[tuple[str, int]]
@@ -32,7 +84,8 @@ class _Parser(HTMLParser):
             accumulate((len(line) for line in raw.splitlines(True)), initial=0)
         )
         self.blocks: list[Block] = []
-        self._skipping = 0
+        self._open: list[str] = []  # open non-void tags
+        self._skip_depth: int | None = None  # set while inside a non-content element
         self._kind: str | None = None
         self._level = 0
         self._chars: _Chars = []
@@ -42,38 +95,44 @@ class _Parser(HTMLParser):
     # --- structure -------------------------------------------------------------------------
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in _NOT_CONTENT:
-            self._skipping += 1
-        elif self._skipping:
+        if tag not in _VOID:
+            self._open.append(tag)
+            if self._skip_depth is None and _is_chrome(tag, dict(attrs)):
+                self._skip_depth = len(self._open)
+                self._flush()
+        if self._skip_depth is not None:
             return
-        elif tag == "table":
+        if tag == "table":
             self._flush()
             self._rows = []
         elif self._rows is not None:
-            if tag == "tr":
-                self._rows.append((False, []))
-            elif tag in ("td", "th") and self._rows:
-                self._cell = []
-                self._rows[-1][1].append(self._cell)
-                if tag == "th":
-                    self._rows[-1] = (True, self._rows[-1][1])
-        elif tag in _HEADINGS:
-            self._start("heading", _HEADINGS[tag])
-        elif tag in _PARAGRAPHS:
-            self._start("paragraph")
-        elif tag == "li":
-            self._start("list_item")
-        elif tag == "pre":
-            self._start("code")
+            self._table_tag(tag)
+        elif tag in _BLOCKS:
+            self._start(*_BLOCKS[tag])
         elif tag in _CONTAINERS:
             self._flush()
 
-    def handle_endtag(self, tag: str) -> None:
-        if tag in _NOT_CONTENT:
-            self._skipping = max(0, self._skipping - 1)
-        elif self._skipping:
+    def _table_tag(self, tag: str) -> None:
+        rows = self._rows
+        if rows is None:
             return
-        elif tag == "table" and self._rows is not None:
+        if tag == "tr":
+            rows.append((False, []))
+        elif tag in ("td", "th") and rows:
+            self._cell = []
+            rows[-1][1].append(self._cell)
+            if tag == "th":
+                rows[-1] = (True, rows[-1][1])
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in self._open:  # tolerate unclosed inner tags: close up to the matching one
+            while self._open.pop() != tag:
+                pass
+        if self._skip_depth is not None:
+            if len(self._open) < self._skip_depth:
+                self._skip_depth = None
+            return
+        if tag == "table" and self._rows is not None:
             self._emit_table(self._rows)
             self._rows = self._cell = None
         elif tag in ("td", "th"):
@@ -82,7 +141,7 @@ class _Parser(HTMLParser):
             self._flush()
 
     def handle_data(self, data: str) -> None:
-        if self._skipping:
+        if self._skip_depth is not None:
             return
         origin = self._offset()
         chars = [(char, min(origin + i, origin + len(data))) for i, char in enumerate(data)]
@@ -126,6 +185,19 @@ class _Parser(HTMLParser):
     def _offset(self) -> int:
         line, column = self.getpos()
         return self._line_starts[min(line - 1, len(self._line_starts) - 1)] + column
+
+
+def _is_chrome(tag: str, attrs: dict[str, str | None]) -> bool:
+    """Interface chrome, not content (ING-023): non-content tags, ARIA chrome roles, hidden
+    elements, and what a site hides when printing (classes like `no-print`)."""
+    classes = (attrs.get("class") or "").lower().split()
+    return (
+        tag in _NOT_CONTENT
+        or (attrs.get("role") or "").lower() in _CHROME_ROLES
+        or "hidden" in attrs
+        or (attrs.get("aria-hidden") or "").lower() == "true"
+        or any(c.endswith(("no-print", "noprint")) for c in classes)
+    )
 
 
 def _normalized(chars: _Chars) -> NormalizedText:

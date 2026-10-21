@@ -100,3 +100,34 @@ def test_elements_are_ordered_disjoint_spans_of_the_document_text(parts: list[st
     assert all(0 <= s.start < s.end <= len(document.text) for s in spans)
     assert all(a.end <= b.start for a, b in pairwise(spans))
     assert "ignored" not in document.text
+
+
+@pytest.mark.spec("ING-023")
+@pytest.mark.parametrize(
+    "noise",
+    [
+        '<div role="alert"><p>Link sent!</p></div>',
+        '<form action="#"><p>Was this page useful?</p><button>Yes</button></form>',
+        '<div aria-hidden="true"><p>Decorative</p></div>',
+        "<div hidden><p>Hidden</p></div>",
+        '<div class="sp-notation sp-no-print"><p>Rate this page</p></div>',
+        '<div role="dialog"><div><p>Cookies?</p></div></div>',
+    ],
+    ids=["alert", "form", "aria-hidden", "hidden", "no-print", "nested-dialog"],
+)
+def test_interface_chrome_is_not_content(noise: str):
+    raw = f"<p>Rent is due.</p>{noise}<p>Pets are allowed.</p>"
+
+    assert kinds_and_texts(raw) == [
+        ("paragraph", "Rent is due."),
+        ("paragraph", "Pets are allowed."),
+    ]
+
+
+def test_content_resumes_after_a_skipped_element_with_nested_divs_and_void_tags():
+    raw = (
+        '<div class="page"><div role="status"><div><img src="x.png"><br>Saved</div></div>'
+        "<p>Rent is due.</p></div><p>Pets are allowed.</p>"
+    )
+
+    assert [text for _, text in kinds_and_texts(raw)] == ["Rent is due.", "Pets are allowed."]
