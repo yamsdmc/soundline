@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from soundline.application.ports import GenerationRequest
@@ -9,13 +11,13 @@ def request(prompt: str) -> GenerationRequest:
 
 
 def test_scripted_responses_are_returned_in_order_and_requests_recorded():
-    model = ScriptedLanguageModel({"claims": []}, {"insufficient_evidence": "Nothing"})
+    model = ScriptedLanguageModel({"claims": []}, "```json\n{}\n``` chatty")
 
     first = model.generate(request("first"))
     second = model.generate(request("second"))
 
-    assert first == {"claims": []}
-    assert second == {"insufficient_evidence": "Nothing"}
+    assert json.loads(first) == {"claims": []}  # mappings come back as JSON text
+    assert second == "```json\n{}\n``` chatty"  # strings come back verbatim
     assert [r.prompt for r in model.requests] == ["first", "second"]
 
 

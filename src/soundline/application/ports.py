@@ -1,6 +1,6 @@
 """Ports: what the application needs from the outside world (see docs/spec/02-architecture.md)."""
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -41,8 +41,8 @@ class GenerationRequest:
 
 
 class LanguageModel(Protocol):
-    def generate(self, request: GenerationRequest) -> Mapping[str, object]:
-        """Returns the model's structured output."""
+    def generate(self, request: GenerationRequest) -> str:
+        """Returns the model's raw output; parsing it is the application's job."""
         ...
 
 

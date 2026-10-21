@@ -23,3 +23,9 @@ class ProviderUnavailableError(SoundlineError):
     """A provider (model, store) cannot be reached right now; retrying later may work (ARC-032)."""
 
     code = "provider_unavailable"
+
+
+class GenerationError(SoundlineError):
+    """The model did not produce a usable answer, even after one corrective retry (GEN-020)."""
+
+    code = "invalid_model_output"
