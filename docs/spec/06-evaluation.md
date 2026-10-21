@@ -90,6 +90,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
 
 - **EVL-040** Each judge is defined by a **versioned rubric prompt** and a model. Judge outputs MUST be structured (score + rationale) and cached by `(judge version, model, inputs)`.
 - **EVL-041** Faithfulness is judged **claim by claim** against the claim's cited quotes only, not against the whole document. This keeps the task narrow and reliable.
+  A section that names a kind of case ("Logement vide", "Logement meublé", "Vous êtes pacsé") is a condition: a claim supported only by quotes under one such section must name it, unless the quotes give the same rule under every kind the claim covers. What one person says about their own case (a forum message) supports no general statement, even attributed. These rules come from the human review of the `logement-fr` labels; local 9 to 12B judges do not apply them reliably (calibration in the README).
 - **EVL-042** Judges SHOULD use a different model family than the generator when available, and the run report MUST state judge models.
 - **EVL-043** **Judge calibration**: `soundline eval calibrate` runs a judge on a human-labeled calibration set and reports agreement (accuracy and Cohen's κ). The report MUST display the judge's calibration status next to judge metrics ("uncalibrated" when unknown).
 - **EVL-044** Judges MUST NOT see which configuration produced an answer (blind evaluation). When comparing two runs pairwise, the presentation order is randomized with a recorded seed.

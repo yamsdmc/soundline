@@ -49,3 +49,13 @@ export SOUNDLINE_HOME=$(mktemp -d) SOUNDLINE_EMBEDDER=fastembed:intfloat/multili
 soundline ingest evals/logement-fr/corpus
 soundline eval run evals/logement-fr/dataset.jsonl --name e5-large
 ```
+
+## Judge labels
+
+`judge-labels.jsonl` holds 54 faithfulness labels (claim, cited quotes with their sections, `entailed`) used by `soundline eval calibrate` (EVL-043). Each label's `review` field says how it was decided:
+
+- three were decided case by case by the maintainer;
+- the others follow two rules the maintainer set: a claim supported only by quotes under one "Logement vide" or "Logement meublé" tab must say so, unless the same rule is quoted for both; what one person says about their own case supports no general statement;
+- the remaining verdicts were proposed by an AI agent (Claude) and kept after that review.
+
+24 of the 54 claims are entailed under these rules.

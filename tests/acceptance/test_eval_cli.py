@@ -217,7 +217,7 @@ def test_a_judge_model_is_enabled_explicitly_on_the_command_line(
     result = run("eval", "run", str(dataset), "--judge", "scripted:judge", "--json")
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.stdout)["settings"]["judge"]["version"] == "faithfulness-v2"
+    assert json.loads(result.stdout)["settings"]["judge"]["version"] == "faithfulness-v3"
 
 
 @pytest.mark.spec("EVL-042", "EVL-043")
@@ -236,7 +236,7 @@ def test_the_report_names_the_judge_its_calibration_and_the_warnings(
 
     result = run("eval", "run", str(dataset), "--judge", "scripted:same")
 
-    assert "judge scripted:test (faithfulness-v2, uncalibrated)" in result.stdout
+    assert "judge scripted:test (faithfulness-v3, uncalibrated)" in result.stdout
     assert "warning: the judge is the same model" in result.stdout
 
 

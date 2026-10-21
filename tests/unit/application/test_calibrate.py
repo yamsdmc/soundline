@@ -77,7 +77,7 @@ def test_calibration_compares_the_judge_with_the_labels_and_lists_disagreements(
         ("b", "states it")
     ]
     assert report.unreviewed == 1
-    assert (report.judge_model, report.judge_version) == ("ollama:judge", "faithfulness-v2")
+    assert (report.judge_model, report.judge_version) == ("ollama:judge", "faithfulness-v3")
 
 
 @pytest.mark.spec("EVL-043")
