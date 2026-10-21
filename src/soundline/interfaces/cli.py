@@ -5,16 +5,23 @@ import os
 import sys
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, NoReturn
 
 import typer
 
 from soundline import Soundline
-from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec
+from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec, llm_from_spec
 from soundline.application.ingest import IngestionReport, IngestionStatus
+from soundline.domain.answers import AnswerStatus, answer_to_dict
 from soundline.domain.datasets import DatasetError
-from soundline.domain.errors import ConfigurationError, IndexMismatchError, SoundlineError
+from soundline.domain.errors import (
+    ConfigurationError,
+    GenerationError,
+    IndexMismatchError,
+    ProviderUnavailableError,
+    SoundlineError,
+)
 from soundline.domain.filters import InvalidFilterError
 from soundline.domain.runs import (
     RunMismatchError,
@@ -27,7 +34,9 @@ from soundline.domain.runs import (
 # Exit codes (CLI-001)
 USAGE_ERROR = 2
 CONFIGURATION_ERROR = 3
+PROVIDER_UNAVAILABLE = 4
 PARTIAL_SUCCESS = 5
+INTERNAL_ERROR = 10
 
 app = typer.Typer(no_args_is_help=True, help="The eval-first RAG engine.")
 inspect_app = typer.Typer(no_args_is_help=True, help="Inspect index internals.")
@@ -44,13 +53,19 @@ Paths = Annotated[list[Path], typer.Argument(help="Files and directories.")]
 def _soundline() -> Generator[Soundline]:
     home = os.environ.get("SOUNDLINE_HOME", ".soundline")
     embedder = os.environ.get("SOUNDLINE_EMBEDDER", DEFAULT_EMBEDDER)
+    llm_spec = os.environ.get("SOUNDLINE_LLM")
     try:
-        with Soundline.open(home, embedder=embedder_from_spec(embedder)) as soundline:
+        llm = llm_from_spec(llm_spec) if llm_spec else None
+        with Soundline.open(home, llm=llm, embedder=embedder_from_spec(embedder)) as soundline:
             yield soundline
     except (InvalidFilterError, DatasetError, RunMismatchError) as error:
         _fail(error, USAGE_ERROR)
     except (ConfigurationError, IndexMismatchError) as error:
         _fail(error, CONFIGURATION_ERROR)
+    except ProviderUnavailableError as error:
+        _fail(error, PROVIDER_UNAVAILABLE)
+    except GenerationError as error:
+        _fail(error, INTERNAL_ERROR)
 
 
 def _fail(error: SoundlineError, exit_code: int) -> NoReturn:
@@ -147,6 +162,31 @@ def inspect_manifest(as_json: JsonOption = False) -> None:
         typer.echo("{}" if as_json else "empty index: no manifest yet")
         return
     typer.echo(json.dumps(manifest.components, indent=None if as_json else 2, sort_keys=True))
+
+
+@app.command(help="A grounded answer whose every claim cites a verified quote.")
+def ask(question: str, as_json: JsonOption = False) -> None:
+    with _soundline() as soundline:
+        answer = soundline.ask(question)
+    if as_json:
+        typer.echo(json.dumps(answer_to_dict(answer)))
+        return
+    if answer.status is AnswerStatus.ABSTAINED:
+        reason = answer.abstention_reason.value if answer.abstention_reason else "unknown"
+        typer.echo(f"No answer ({reason}). {answer.abstention_message or ''}".rstrip())
+        return
+    typer.echo(answer.text)
+    typer.echo()
+    for number, citation in enumerate(answer.citations, 1):
+        where = " > ".join(citation.section_path)
+        label = PurePosixPath(citation.source).name + (f", {where}" if where else "")
+        marker = " (approximate)" if citation.approximate else ""
+        typer.echo(f'[{number}] {label}: "{citation.quote}"{marker}')  # GEN-042
+    if answer.dropped_claims:
+        typer.echo()
+        typer.echo(f"{answer.status.value}: unsupported claims were removed:")
+        for claim in answer.dropped_claims:
+            typer.echo(f"  - {claim}")
 
 
 @eval_app.command("run", help="Evaluate retrieval on a JSONL dataset and store the run.")

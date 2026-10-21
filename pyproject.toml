@@ -35,6 +35,11 @@ Homepage = "https://github.com/yamsdmc/soundline"
 Documentation = "https://github.com/yamsdmc/soundline/tree/main/docs"
 Issues = "https://github.com/yamsdmc/soundline/issues"
 
+[project.optional-dependencies]
+anthropic = [
+    "anthropic>=1.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.3",

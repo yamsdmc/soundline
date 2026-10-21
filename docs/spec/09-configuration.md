@@ -69,7 +69,8 @@ model = "anthropic:claude-sonnet-5-5"
 context_budget_tokens = 6000
 history_budget_tokens = 1500        # GEN-062
 max_output_tokens = 1024
-temperature = 0.0
+# no temperature: current Claude models reject sampling parameters; determinism comes from
+# structured output and from caching model calls in evaluations (EVL-061)
 fuzzy_quote_threshold = 0.9
 fuzzy_min_chars = 30
 citation_mode = "schema"            # "schema" | "native" (provider-native citations, GEN-022)

@@ -175,5 +175,7 @@ def _verified(claim: _ModelClaim, evidence: Mapping[str, Chunk]) -> Claim:
         if result.method is Method.FAILED:
             continue
         span = result.span.shifted_by(chunk.span.start)
-        citations.append(Citation(chunk.source, result.quote, span, result.approximate))
+        citations.append(
+            Citation(chunk.source, result.quote, span, result.approximate, chunk.section_path)
+        )
     return Claim(claim.text, tuple(citations))

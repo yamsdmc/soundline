@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from soundline.interfaces.cli import app
+from soundline.testing import ScriptedLanguageModel
 
 type Run = Callable[..., Result]
 
@@ -162,3 +163,48 @@ def test_evaluating_a_dataset_that_does_not_exist_is_a_clean_usage_error(run: Ru
     assert result.exit_code == 2
     assert "Traceback" not in result.output
     assert "missing.jsonl" in result.output
+
+
+@pytest.mark.spec("CLI-004")
+def test_asking_without_a_language_model_explains_how_to_configure_one(run: Run, docs: Path):
+    run("ingest", str(docs))
+
+    result = run("ask", "When is rent due?")
+
+    assert result.exit_code == 3
+    assert "SOUNDLINE_LLM" in result.output
+
+
+@pytest.mark.spec("GEN-042", "GEN-034")
+def test_ask_prints_the_answer_its_citations_and_what_was_dropped(
+    run: Run, docs: Path, monkeypatch: pytest.MonkeyPatch
+):
+    scripted = ScriptedLanguageModel(
+        {
+            "claims": [
+                {
+                    "text": "Rent is due on the 5th.",
+                    "citations": [{"evidence_id": "E1", "quote": "Rent is due on the 5th"}],
+                },
+                {
+                    "text": "Parking is free.",
+                    "citations": [{"evidence_id": "E1", "quote": "Parking is free"}],
+                },
+            ]
+        }
+    )
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return scripted
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    run("ingest", str(docs))
+
+    result = run("ask", "rent due 5th")
+
+    assert result.exit_code == 0, result.output
+    assert "Rent is due on the 5th [1]." in result.stdout
+    assert '[1] lease.md, Lease > Payment: "Rent is due on the 5th"' in result.stdout
+    assert "partial" in result.stdout
+    assert "Parking is free." in result.stdout

@@ -23,7 +23,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --all-extras
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run pyright
@@ -46,7 +46,7 @@ jobs:
         with:
           enable-cache: true
           python-version: ${{ matrix.python }}
-      - run: uv sync --locked
+      - run: uv sync --locked --all-extras
       - name: Show the SQLite binding in use
         shell: bash
         run: >-
@@ -64,7 +64,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --all-extras
       - run: scripts/smoke_eval.sh
 
   sqlite-probe:

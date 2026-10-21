@@ -161,7 +161,8 @@ class Soundline:
     def ask(self, question: str) -> Answer:
         if self._llm is None:
             raise ConfigurationError(  # CLI-004
-                "asking needs a language model; configure one (generation.model) or use search"
+                "asking needs a language model: set SOUNDLINE_LLM (e.g."
+                " anthropic:claude-sonnet-5-5), or use search, which needs none"
             )
         return ask(question, self._retriever, self._llm)
 
@@ -215,6 +216,20 @@ def embedder_from_spec(spec: str) -> Embedder:
     raise ConfigurationError(
         f"unknown embedder {spec!r}; use 'fastembed:<model>' or 'hashing:<dimension>'"
     )
+
+
+def llm_from_spec(spec: str) -> LanguageModel:
+    """`<provider>:<model>` (CFG-010), e.g. `anthropic:claude-sonnet-5-5`."""
+    provider, _, model = spec.partition(":")
+    if provider == "anthropic" and model:
+        try:
+            from soundline.adapters.llms.anthropic import AnthropicLanguageModel  # noqa: PLC0415
+        except ImportError as error:  # ARC-012, CFG-014
+            raise ConfigurationError(
+                'the Anthropic provider needs: pip install "soundline[anthropic]"'
+            ) from error
+        return AnthropicLanguageModel(model)
+    raise ConfigurationError(f"unknown language model {spec!r}; use 'anthropic:<model>'")
 
 
 def _default_embedder() -> Embedder:

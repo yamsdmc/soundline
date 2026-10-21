@@ -30,6 +30,8 @@ class Citation:
     span: Span
     approximate: bool = False
     """Verified by fuzzy matching; the quote shown is still the source text (GEN-038)."""
+    section_path: tuple[str, ...] = ()
+    """Where the quote sits in its document (GEN-031)."""
 
 
 @dataclass(frozen=True)
@@ -64,3 +66,23 @@ def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
         closing = claim.text[len(body) :]
         sentences.append(f"{body} {markers}{closing}")
     return " ".join(sentences), numbered
+
+
+def answer_to_dict(answer: Answer) -> dict[str, object]:
+    return {
+        "status": answer.status.value,
+        "text": answer.text,
+        "citations": [
+            {
+                "source": c.source,
+                "quote": c.quote,
+                "span": [c.span.start, c.span.end],
+                "section_path": list(c.section_path),
+                "approximate": c.approximate,
+            }
+            for c in answer.citations
+        ],
+        "dropped_claims": answer.dropped_claims,
+        "abstention_reason": answer.abstention_reason.value if answer.abstention_reason else None,
+        "abstention_message": answer.abstention_message,
+    }
