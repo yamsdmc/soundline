@@ -2,7 +2,7 @@
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import cast
 
@@ -25,7 +25,14 @@ from soundline.domain.answers import (
 )
 from soundline.domain.chunks import Chunk
 from soundline.domain.conversation import Turn, pack_history
-from soundline.domain.errors import GenerationError, ProviderUnavailableError
+from soundline.domain.errors import GenerationError, ProviderUnavailableError, SoundlineError
+from soundline.domain.events import (
+    AnswerCompleted,
+    AskEvent,
+    ClaimVerified,
+    RetrievalCompleted,
+    StreamError,
+)
 from soundline.domain.usage import Price, StageUsage, Usage, price_for
 from soundline.domain.verification import Method, verify_quote
 
@@ -68,30 +75,60 @@ def ask(
     history: Sequence[Turn] = (),
 ) -> Answer:
     """`history` holds previous turns, text only: context, never evidence (GEN-060)."""
+    for event in ask_stream(question, retriever, llm, settings, history):
+        if isinstance(event, StreamError):
+            raise event.error
+        if isinstance(event, AnswerCompleted):
+            return event.answer
+    raise AssertionError("ask_stream ended without an answer")  # pragma: no cover
+
+
+def ask_stream(
+    question: str,
+    retriever: Retriever,
+    llm: LanguageModel,
+    settings: GenerationSettings | None = None,
+    history: Sequence[Turn] = (),
+) -> Iterator[AskEvent]:
+    """Like `ask`, as events (GEN-050). Claims are emitted once generation completes and
+    each is verified (GEN-051); parsing partial output to emit them sooner is future work."""
     settings = settings or GenerationSettings()
     calls = _Calls(llm, settings.prices)
     packed = pack_history(history, settings.history_budget_tokens)
     warnings: list[str] = []
-    search_query = question
-    if packed.turns:
-        search_query = _condensed(question, packed.turns, calls, settings, warnings)
-    hits = retriever.search(search_query, settings.k)
-    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(hits, 1)}
-    query = QueryInfo(question, search_query, len(packed.turns), packed.dropped)
+    try:
+        search_query = question
+        if packed.turns:
+            search_query = _condensed(question, packed.turns, calls, settings, warnings)
+        hits = retriever.search(search_query, settings.k)
+        evidence = {f"E{rank}": chunk for rank, chunk in enumerate(hits, 1)}
+        yield RetrievalCompleted(search_query, tuple(evidence.values()))
+        query = QueryInfo(question, search_query, len(packed.turns), packed.dropped)
 
-    if not evidence:  # GEN-001: no evidence, no generation call
-        answer = Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
-        return replace(answer, query=query, warnings=tuple(warnings), usage=calls.usage())
-    request = grounded_request(settings.prompt, question, evidence, packed.turns)
-    output = _generate(calls, request)
-    return replace(
-        _answer(output, evidence),
-        lenient_parse=output.lenient,
-        prompt_version=settings.prompt.version,
-        usage=calls.usage(),
-        query=query,
-        warnings=tuple(warnings),
-    )
+        def completed(answer: Answer) -> AnswerCompleted:
+            usage = calls.usage()
+            return AnswerCompleted(
+                replace(answer, query=query, warnings=tuple(warnings), usage=usage)
+            )
+
+        if not evidence:  # GEN-001: no evidence, no generation call
+            yield completed(
+                Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
+            )
+            return
+        request = grounded_request(settings.prompt, question, evidence, packed.turns)
+        output = _generate(calls, request)
+        verified = [_verified(claim, evidence) for claim in output.claims]
+        if output.insufficient_evidence is None:
+            for claim in verified:
+                if claim.citations:
+                    yield ClaimVerified(claim)
+        answer = _answer(output, verified)
+        yield completed(
+            replace(answer, lenient_parse=output.lenient, prompt_version=settings.prompt.version)
+        )
+    except SoundlineError as error:
+        yield StreamError(error)
 
 
 def _condensed(
@@ -115,14 +152,13 @@ def _condensed(
     return question
 
 
-def _answer(output: "_ModelOutput", evidence: Mapping[str, Chunk]) -> Answer:
+def _answer(output: "_ModelOutput", verified: Sequence[Claim]) -> Answer:
     if output.insufficient_evidence is not None:  # GEN-021
         return Answer(
             AnswerStatus.ABSTAINED,
             abstention_reason=AbstentionReason.MODEL_INSUFFICIENT_EVIDENCE,
             abstention_message=output.insufficient_evidence,
         )
-    verified = [_verified(claim, evidence) for claim in output.claims]
     supported = [claim for claim in verified if claim.citations]
     dropped = [claim.text for claim in verified if not claim.citations]  # GEN-033
     if not supported:
