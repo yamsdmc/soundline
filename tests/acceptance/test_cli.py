@@ -218,7 +218,9 @@ def test_search_explain_shows_each_step_with_its_duration(run: Run, docs: Path):
 
     assert result.exit_code == 0
     lines = result.stdout.splitlines()
-    tree = lines[lines.index(next(line for line in lines if line.startswith("soundline.search ["))) :]
+    tree = lines[
+        lines.index(next(line for line in lines if line.startswith("soundline.search ["))) :
+    ]
     assert [line.split(" [")[0] for line in tree[:5]] == [
         "soundline.search",
         "├─ embed query",

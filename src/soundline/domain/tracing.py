@@ -1,7 +1,7 @@
 """Traces of one operation as a tree of timed steps (OBS-001, OBS-004)."""
 
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
@@ -23,7 +23,7 @@ class Tracer:
         self.root: TraceSpan | None = None
 
     @contextmanager
-    def span(self, name: str, **attributes: object) -> Iterator[TraceSpan]:
+    def span(self, name: str, **attributes: object) -> Generator[TraceSpan]:
         current = TraceSpan(name, dict(attributes))
         if self._stack:
             self._stack[-1].children.append(current)
