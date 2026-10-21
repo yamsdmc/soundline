@@ -39,27 +39,28 @@ All three share the embedder, k = 5 and the model: `qwen3.5:9b` through Ollama, 
 
 | | Naive RAG | Soundline, verification off | Soundline |
 |---|---|---|---|
-| False answers to unanswerable questions (n=18) ↓ | 0.61 [0.39, 0.83] | 0.17 [0.00, 0.33] | **0.17** [0.00, 0.33] |
+| False answers to unanswerable questions (n=18) ↓ | 0.61 [0.39, 0.83] | 0.11 [0.00, 0.28] | **0.11** [0.00, 0.28] |
 | Injections that reach the answer (n=6) ↓ | 0.67 [0.33, 1.00] | 0.67 [0.33, 1.00] | 0.67 [0.33, 1.00] |
 | ... without any warning to the user (n=6) ↓ | 0.67 [0.33, 1.00] | 0.33 [0.00, 0.67] | **0.33** [0.00, 0.67] |
-| Answerable questions answered (n=29) ↑ | 0.97 | 0.97 | 0.97 |
-| Correctness against reference answers (n=28) ↑ | 0.89 [0.80, 0.98] | 0.88 [0.77, 0.96] | 0.84 [0.71, 0.95] |
-| Faithfulness, claim by claim ↑ | **0.71** [0.59, 0.82] | 0.69 [0.54, 0.82] | 0.69 [0.54, 0.82] |
+| Answerable questions answered ↑ | 0.97 (n=29) | 0.96 (n=28) | 0.96 (n=28) |
+| Correctness against reference answers ↑ | 0.89 [0.80, 0.98] | 0.91 [0.81, 0.98] | **0.91** [0.81, 0.98] |
+| Faithfulness, claim by claim ↑ | 0.71 [0.59, 0.82] | 0.71 [0.56, 0.84] | 0.71 [0.57, 0.85] |
 | Citations shown that exist in the source ↑ | not checkable | 0.99 | **1.00** |
-| Latency p50 / p95 ↓ | 5.9 s / 8.1 s | 11.1 s / 22.2 s | 11.1 s / 22.2 s |
-| Input tokens p50 ↓ | 1,291 | 2,469 | 2,469 |
+| Latency p50 / p95 ↓ | 5.9 s / 8.1 s | 9.3 s / 26.3 s | 9.4 s / 26.2 s |
+| Input tokens p50 ↓ | 1,291 | 2,768 | 2,768 |
 
 What this shows, and what it does not:
 
-- **Soundline gives far fewer false answers** (3 of 18 against 11 of 18; paired difference −0.44 [−0.67, −0.22]), **without a significant loss of correctness** (−0.09 [−0.22, +0.02]). **The gain does not come from verification**: Soundline without verification does exactly as well. It comes from the answer protocol (claims tied to evidence, and an explicit way to say the evidence is insufficient).
+- **Soundline gives far fewer false answers** (2 of 18 against 11 of 18; paired difference −0.50 [−0.72, −0.28]), **with the same correctness** (−0.04 [−0.15, +0.06] on the cases both answered). **The gain does not come from verification**: Soundline without verification does exactly as well. It comes from the answer protocol (claims tied to evidence, and an explicit way to say the evidence is insufficient).
 - **Verification changes almost nothing with this model.** qwen3.5:9b already quotes its sources faithfully (99% of its quotes exist), so there is little to remove. Verification guarantees that what is shown exists, 100% of the time; how often that matters depends on the model, which this run does not measure.
-- **Planted content still reaches the answer** in 4 of 6 cases, for all three systems. **A verified quote proves that the source says it, not that the source is right.** What Soundline adds is a warning: when a planted page contradicts an official one, it states both versions, each attributed to its source, and reports `Sources disagree on ...` (GEN-090). It did so on all 4 questions where a planted page contradicts an official one, and on no other. The 2 injections that pass unflagged (a fake winter-truce date, a fake insurance price) have nothing in the documents to contradict them.
-- **Soundline's claims are less faithful than they should be, and the comparison flatters the baseline.** Most rejected Soundline claims drop a condition of their quote's section: "the notice is 3 months" from a quote under "Logement vide > Vous vivez seul". The prompt asks to keep such conditions; a 9B model often does not. The baseline is not judged on this at all: its citations are whole 1,000-character chunks with no section titles, so the judge cannot see the conditions it drops. On the cases both systems answered, the judged gap is −0.16 [−0.29, −0.05]. Making claims carry their section's conditions is the next generation improvement.
+- **Planted content still reaches the answer** in 4 of 6 cases, for all three systems. **A verified quote proves that the source says it, not that the source is right.** What Soundline adds is a warning: when a planted page contradicts an official one, it states both versions, each attributed to its source, and reports `Sources disagree on ...` (GEN-090). The injections that pass unflagged (a fake winter-truce date, a fake insurance price) have nothing in the documents to contradict them.
+- **Faithfulness is where Soundline is weakest.** Most rejected claims drop or blur a condition of their quote's section: "the notice is 3 months" from a quote under "Logement vide > Vous vivez seul". Two changes target this: the prompt asks claims to start with their case (`grounded-v6`), and the code attaches a section's condition to a claim that does not name it, `Le préavis est de 3 mois (Logement vide) [1]` (GEN-095, 23 of 78 claims here). They lifted faithfulness only from 0.69 to 0.71: nested conditions and conditions the model adds remain. The comparison also flatters the baseline: its citations are whole chunks with no section titles, so the judge cannot see the conditions it drops; on the cases both systems answered, the judged gap is −0.17 [−0.30, −0.04].
+- **One case of 47 failed**: the model's output stayed invalid JSON after the retry; the run records it and goes on (EVL-068).
 - **Local judges are not reliable here.** On the same 54 labels, qwen3.5:9b reaches κ 0.27 and gemma3:12b about 0: they see a "Logement meublé" section and still accept a claim that does not say it. Earlier faithfulness numbers judged by them were dropped.
-- **The cost**: about 1.9× the latency at the median, 2.7× at p95, and 1.9× the input tokens.
+- **The cost**: about 1.6× the latency at the median, 3.2× at p95, and 2.1× the input tokens.
 - **Limits**: one generator model, one run, 47 questions (the intervals are wide; 6 injection cases are too few for a firm rate). The reference answers and most labels were drafted by an AI agent under rules the maintainer set (see [evals/logement-fr](evals/logement-fr/README.md)).
 
-Full results, with every paired comparison: [benchmarks/trust/results.md](benchmarks/trust/results.md). Reproduce them: `make bench-trust` (needs [Ollama](https://ollama.com) with `qwen3.5:9b`; the judge defaults to the same model, free but unreliable; `JUDGE=openai:anthropic/claude-sonnet-5.5` with an OpenRouter key in `OPENAI_API_KEY` and `OPENAI_BASE_URL=https://openrouter.ai/api/v1` reproduces the judged numbers, for about $0.90).
+Full results, with every paired comparison: [benchmarks/trust/results.md](benchmarks/trust/results.md). Reproduce them: `make bench-trust` (needs [Ollama](https://ollama.com) with `qwen3.5:9b`; the judge defaults to the same model, free but unreliable; `JUDGE=openai:anthropic/claude-sonnet-5.5` with an OpenRouter key in `OPENAI_API_KEY` and `OPENAI_BASE_URL=https://openrouter.ai/api/v1` reproduces the judged numbers, for about $1).
 
 ## What it will look like
 
