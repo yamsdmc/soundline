@@ -47,10 +47,14 @@ class EvalRun:
 
 
 def aggregate(per_case: Mapping[str, Mapping[str, float]]) -> dict[str, Estimate]:
+    """Each metric over the cases that define it (e.g. false_answer_rate: unanswerable ones)."""
     from soundline.domain.statistics import bootstrap_mean  # noqa: PLC0415
 
     names = sorted({name for metrics in per_case.values() for name in metrics}, key=_natural)
-    return {name: bootstrap_mean({c: m[name] for c, m in per_case.items()}) for name in names}
+    return {
+        name: bootstrap_mean({c: m[name] for c, m in per_case.items() if name in m})
+        for name in names
+    }
 
 
 def compare_runs(baseline: EvalRun, run: EvalRun, tolerance: float = 0.0) -> dict[str, Comparison]:

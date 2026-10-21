@@ -91,3 +91,17 @@ def test_a_hit_on_any_occurrence_of_a_quote_counts():
     metrics = retrieval_metrics([(first, second)], [at(495, 525)], ks=(1,))
 
     assert metrics["hit_rate@1"] == 1.0
+
+
+@pytest.mark.spec("EVL-020", "EVL-050")
+def test_a_metric_is_averaged_over_the_cases_that_define_it():
+    per_case = {
+        "answerable": {"answer_rate": 1.0},
+        "unanswerable-1": {"false_answer_rate": 1.0},
+        "unanswerable-2": {"false_answer_rate": 0.0},
+    }
+
+    metrics = aggregate(per_case)
+
+    assert (metrics["false_answer_rate"].mean, metrics["false_answer_rate"].cases) == (0.5, 2)
+    assert (metrics["answer_rate"].mean, metrics["answer_rate"].cases) == (1.0, 1)
