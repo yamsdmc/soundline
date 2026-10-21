@@ -253,11 +253,14 @@ def llm_from_spec(spec: str) -> LanguageModel:
         if provider == "openai":
             return OpenAICompatibleLanguageModel(model)
         host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-        # Local models: deterministic sampling, and the lenient parser for loose JSON (CFG-013).
+        # Local models: deterministic sampling, the lenient parser for loose JSON (CFG-013), and
+        # no thinking: minutes of reasoning per answer on a laptop, for an answer verified anyway.
         import openai  # noqa: PLC0415
 
         client = openai.OpenAI(base_url=f"{host}/v1", api_key="ollama")
-        return OpenAICompatibleLanguageModel(model, client, temperature=0.0)
+        return OpenAICompatibleLanguageModel(
+            model, client, temperature=0.0, reasoning_effort="none"
+        )
     raise ConfigurationError(
         f"unknown language model {spec!r}; use anthropic:<model>, openai:<model> or ollama:<model>"
     )

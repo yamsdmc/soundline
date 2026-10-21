@@ -1,37 +1,64 @@
 """Any OpenAI-compatible chat server: OpenAI, Ollama, vLLM, LM Studio (install
 `soundline[openai]`, CFG-011)."""
 
+import logging
 from typing import Literal
 
 import openai
 from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.completion_create_params import ResponseFormat
+from openai.types.shared import ReasoningEffort
 
 from soundline.application.answer_format import ANSWER_SCHEMA
 from soundline.application.ports import GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
 
+_log = logging.getLogger(__name__)
+_NOT_IMPLEMENTED = 501
+JsonMode = Literal["schema", "object", "prompt"]
+
+
+class _StructuredOutputUnavailableError(Exception):
+    """The server rejected `response_format` as not implemented."""
+
 
 class OpenAICompatibleLanguageModel:
     """Schema-constrained JSON by default; `json_mode="object"` for servers or small local
-    models without JSON-schema support (the lenient parser covers the rest, GEN-023)."""
+    models without JSON-schema support, `"prompt"` for none at all: the format is then only
+    asked in the prompt. The output is validated the same way in every mode (GEN-023)."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # keyword-only options
         self,
         model: str,
         client: openai.OpenAI | None = None,
         *,
-        json_mode: Literal["schema", "object"] = "schema",
+        json_mode: JsonMode = "schema",
         temperature: float | None = None,
         max_tokens: int = 4096,
+        reasoning_effort: ReasoningEffort = None,
     ) -> None:
         self._model = model
         self._client = client or openai.OpenAI()  # OPENAI_API_KEY, OPENAI_BASE_URL
         self._json_mode = json_mode
         self._temperature = temperature
         self._max_tokens = max_tokens
+        self._reasoning_effort: ReasoningEffort = reasoning_effort
 
     def generate(self, request: GenerationRequest) -> str:
+        try:
+            return self._generate(request)
+        except _StructuredOutputUnavailableError as error:
+            # Some servers cannot constrain output (e.g. Ollama without its grammar library):
+            # ask for the format in the prompt only; validation is unchanged (GEN-012).
+            _log.warning(
+                "%s: structured output is unavailable (%s); asking for JSON in the prompt only",
+                self._model,
+                error,
+            )
+            self._json_mode = "prompt"
+            return self._generate(request)
+
+    def _generate(self, request: GenerationRequest) -> str:
         messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": request.system},
             {"role": "user", "content": request.prompt},
@@ -43,6 +70,9 @@ class OpenAICompatibleLanguageModel:
                 messages=messages,
                 response_format=self._response_format(),
                 temperature=openai.omit if self._temperature is None else self._temperature,
+                reasoning_effort=(
+                    openai.omit if self._reasoning_effort is None else self._reasoning_effort
+                ),
             )
         except (openai.AuthenticationError, openai.PermissionDeniedError) as error:
             raise ConfigurationError(
@@ -53,7 +83,15 @@ class OpenAICompatibleLanguageModel:
                 f"unknown model {self._model!r}; for Ollama, run `ollama pull {self._model}`"
             ) from error
         except (openai.RateLimitError, openai.InternalServerError) as error:
-            raise ProviderUnavailableError(f"the model server is unavailable: {error}") from error
+            if error.status_code != _NOT_IMPLEMENTED:
+                raise ProviderUnavailableError(
+                    f"the model server is unavailable: {error}"
+                ) from error
+            if self._json_mode != "prompt":
+                raise _StructuredOutputUnavailableError(error.message) from error
+            raise ConfigurationError(
+                f"the server does not implement chat completions for {self._model!r} (501)"
+            ) from error
         except openai.APIConnectionError as error:  # includes timeouts
             raise ProviderUnavailableError(
                 f"cannot reach the model server at {self._client.base_url}"
@@ -66,7 +104,9 @@ class OpenAICompatibleLanguageModel:
         # and the use case retries once (GEN-071, GEN-020).
         return content
 
-    def _response_format(self) -> ResponseFormat:
+    def _response_format(self) -> ResponseFormat | openai.Omit:
+        if self._json_mode == "prompt":
+            return openai.omit
         if self._json_mode == "object":
             return {"type": "json_object"}
         return {

@@ -33,9 +33,19 @@ def completion(content: str | None, finish_reason: str = "stop") -> dict[str, ob
 def model_answering(
     status: int, body: dict[str, object], seen: list[Any] | None = None, **options: Any
 ) -> OpenAICompatibleLanguageModel:
+    return model_replying([(status, body)], seen, **options)
+
+
+def model_replying(
+    replies: list[tuple[int, dict[str, object]]], seen: list[Any] | None = None, **options: Any
+) -> OpenAICompatibleLanguageModel:
+    """Replies in order; the last one repeats."""
+    pending = list(replies)
+
     def handler(request: httpx2.Request) -> httpx2.Response:
         if seen is not None:
             seen.append(json.loads(request.content))
+        status, body = pending.pop(0) if len(pending) > 1 else pending[0]
         return httpx2.Response(status, json=body)
 
     client = openai.OpenAI(
@@ -121,3 +131,40 @@ def test_a_truncated_output_is_returned_as_is_so_the_parser_rejects_it():
         model_answering(200, completion('{"claims": [', "length")).generate(REQUEST)
         == '{"claims": ['
     )
+
+
+UNSUPPORTED: tuple[int, dict[str, object]] = (
+    501,
+    {"error": {"message": "structured output is unavailable"}},
+)
+
+
+@pytest.mark.spec("GEN-012", "GEN-023")
+def test_a_server_without_structured_output_falls_back_to_json_asked_in_the_prompt(
+    caplog: pytest.LogCaptureFixture,
+):
+    seen: list[Any] = []
+    model = model_replying([UNSUPPORTED, (200, completion(ANSWER))], seen)
+
+    first, second = model.generate(REQUEST), model.generate(REQUEST)
+
+    assert first == second == ANSWER
+    assert "response_format" in seen[0]
+    assert ["response_format" in body for body in seen[1:]] == [False, False]
+    assert len(caplog.records) == 1  # one warning, then remembered
+
+
+@pytest.mark.spec("ARC-032")
+def test_a_server_that_implements_nothing_we_need_is_a_configuration_error():
+    with pytest.raises(ConfigurationError, match="501"):
+        model_replying([UNSUPPORTED], json_mode="prompt").generate(REQUEST)
+
+
+def test_a_reasoning_effort_is_sent_only_when_configured():
+    seen: list[Any] = []
+
+    model_answering(200, completion(ANSWER), seen).generate(REQUEST)
+    model_answering(200, completion(ANSWER), seen, reasoning_effort="none").generate(REQUEST)
+
+    assert "reasoning_effort" not in seen[0]
+    assert seen[1]["reasoning_effort"] == "none"
