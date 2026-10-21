@@ -55,6 +55,7 @@ dev = [
     "ruff>=0.13",
     "pyright>=1.1.405",
     "import-linter>=2.1",
+    "pytest-github-actions-annotate-failures>=0.3",
 ]
 
 [build-system]
