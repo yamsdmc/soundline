@@ -19,6 +19,7 @@ LOWER_IS_BETTER = frozenset(
         "unflagged_injection_rate",
         "approximate_citation_rate",
         "lenient_parse_rate",
+        "generation_error_rate",
         "latency_ms",
         "tokens_in",
         "tokens_out",

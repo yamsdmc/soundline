@@ -12,7 +12,14 @@ from pathlib import PurePosixPath
 from soundline.application.judges import CorrectnessJudge, FaithfulnessJudge
 from soundline.application.ports import DocumentStore, Index
 from soundline.domain.answers import Answer, AnswerStatus, answer_to_dict
-from soundline.domain.datasets import Dataset, DatasetError, RelevantQuote, parse_dataset
+from soundline.domain.datasets import (
+    Dataset,
+    DatasetError,
+    EvalCase,
+    RelevantQuote,
+    parse_dataset,
+)
+from soundline.domain.errors import GenerationError
 from soundline.domain.evaluation import Located, generation_metrics, retrieval_metrics
 from soundline.domain.hits import Hit
 from soundline.domain.quotes import Span
@@ -151,6 +158,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
     answers: dict[str, dict[str, object]] = {}
     unreadable = 0
     cache_hits = 0
+    unanswered = 0
     for case in dataset.cases:
         metrics: dict[str, float] = {}
         if case.answerable:  # retrieval metrics need relevant quotes (EVL-003)
@@ -159,7 +167,15 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             metrics.update(retrieval_metrics(quotes[case.id], located, settings.ks))
         if generator is not None:
             started = clock()
-            answer = generator.answer(case.question)
+            try:
+                answer = generator.answer(case.question)
+            except GenerationError as error:  # EVL-068: record it, go on
+                metrics["generation_error_rate"] = 1.0
+                answers[case.id] = {"error": error.code, "message": str(error)}
+                unanswered += 1
+                per_case[case.id] = metrics
+                continue
+            metrics["generation_error_rate"] = 0.0
             cached = [stage for stage in answer.usage.stages if stage.cached]
             cache_hits += len(cached)
             # A cached call took no time now: count it at its original duration (EVL-030).
@@ -171,18 +187,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             )
             metrics.update(_operational(answer, latency_ms))
             answers[case.id] = answer_to_dict(answer)
-            if generator.judge is not None:
-                judged, failed = judge_claims(generator.judge, answer, metrics)
-                answers[case.id]["judgments"] = judged
-                unreadable += failed
-            if generator.correctness is not None and case.reference_answer is not None:
-                verdict = judge_correctness(
-                    generator.correctness, case.question, case.reference_answer, answer, metrics
-                )
-                if verdict is not None:
-                    answers[case.id]["correctness"] = verdict
-                elif answer.status is not AnswerStatus.ABSTAINED and answer.claims:
-                    unreadable += 1
+            unreadable += _judge_case(generator, case, answer, metrics, answers[case.id])
         if metrics:
             per_case[case.id] = metrics
     manifest = index.manifest.load()
@@ -213,7 +218,9 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
         settings={"ks": list(settings.ks), **mode},
         per_case=per_case,
         metrics=aggregate(per_case),
-        warnings=_judge_warnings(generator, unreadable) + _cache_warnings(cache_hits),
+        warnings=_judge_warnings(generator, unreadable)
+        + _cache_warnings(cache_hits)
+        + _unanswered_warnings(unanswered),
         answers=answers,
         operations={
             metric: describe([m[metric] for m in per_case.values() if metric in m])
@@ -221,6 +228,28 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             if any(metric in m for m in per_case.values())
         },
     )
+
+
+def _judge_case(
+    generator: Generator,
+    case: EvalCase,
+    answer: Answer,
+    metrics: dict[str, float],
+    record: dict[str, object],
+) -> int:
+    """Faithfulness and correctness, when enabled (EVL-021); returns the unreadable verdicts."""
+    unreadable = 0
+    if generator.judge is not None:
+        record["judgments"], unreadable = judge_claims(generator.judge, answer, metrics)
+    if generator.correctness is not None and case.reference_answer is not None:
+        verdict = judge_correctness(
+            generator.correctness, case.question, case.reference_answer, answer, metrics
+        )
+        if verdict is not None:
+            record["correctness"] = verdict
+        elif answer.status is not AnswerStatus.ABSTAINED and answer.claims:
+            unreadable += 1
+    return unreadable
 
 
 def judge_claims(
@@ -268,6 +297,13 @@ def judge_correctness(
         return None
     metrics["correctness"] = judgment.score
     return {"score": judgment.score, "rationale": judgment.rationale}
+
+
+def _unanswered_warnings(unanswered: int) -> list[str]:
+    if not unanswered:
+        return []
+    cases = "1 case" if unanswered == 1 else f"{unanswered} cases"
+    return [f"{cases} could not be answered: the model's output stayed invalid (EVL-068)"]
 
 
 def _cache_warnings(cache_hits: int) -> list[str]:

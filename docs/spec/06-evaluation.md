@@ -124,6 +124,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
   ```
 - **EVL-065** Reports MUST be available as terminal tables, JSON (machine-readable, stable schema), Markdown (for PR comments) and a standalone HTML file (per-case drill-down: question, hits with explanations, answer, citations, verdicts).
 - **EVL-066** A baseline can be promoted by name (`soundline eval baseline set main <run>`), so CI compares against a named reference. `compare` refuses runs whose dataset content hashes differ, unless `--allow-dataset-change` is passed (then only shared case IDs are compared, and the report says so).
+- **EVL-068** A case whose answer cannot be generated (the model's output stays invalid after the corrective retry, GEN-020) is recorded in the run with its error, scored `generation_error_rate` = 1, and the run goes on: one bad output must not discard a long run. Its answer metrics are not computed. An unavailable provider still stops the run, since every later case would fail the same way.
 - **EVL-067** A reusable **GitHub Action** (`yamsdmc/soundline-eval-action`) runs an eval on a pull request, compares it with a named baseline, and posts or updates **one** PR comment with: the metric differences with CIs and verdicts, the cases that flipped (newly failing or passing) with links to their drill-down, and a **chunk diff** for flipped cases (how the chunks covering their relevant quotes changed). It is usable by any project with a Soundline index, not only Soundline itself.
 
 ## Experiments

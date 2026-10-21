@@ -242,3 +242,23 @@ def test_a_judge_scores_correctness_against_the_reference_answer_blind(tmp_path:
     prompt = judge.requests[1].prompt
     assert "Rent is due on the 5th." in prompt
     assert [s for s in ("[1]", "lease.md", "ollama") if s in prompt] == []  # blind (EVL-044)
+
+
+@pytest.mark.spec("EVL-068")
+def test_a_case_whose_output_stays_invalid_is_recorded_and_the_run_goes_on(dataset: Path):
+    llm = ScriptedLanguageModel(
+        "not json",
+        "still not json",
+        {"claims": [], "insufficient_evidence": "The lease says nothing about parking."},
+    )
+    soundline = Soundline.in_memory(llm=llm)
+    soundline.ingest_text("lease.md", LEASE)
+
+    run = soundline.evaluate(dataset)
+
+    assert run.per_case["rent-due"]["generation_error_rate"] == 1.0
+    assert "answer_rate" not in run.per_case["rent-due"]
+    assert run.answers["rent-due"]["error"] == "invalid_model_output"
+    assert run.per_case["parking"]["false_answer_rate"] == 0.0
+    assert run.per_case["parking"]["generation_error_rate"] == 0.0
+    assert any("1 case could not be answered" in warning for warning in run.warnings)
