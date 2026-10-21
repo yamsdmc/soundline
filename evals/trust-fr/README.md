@@ -30,3 +30,7 @@ The synthetic pages are written for this benchmark and contain no real data, see
 | Total | 47 |
 
 Run it: `make bench-trust` (see [benchmarks/trust](../../benchmarks/trust)).
+
+## Reference answers
+
+Each answerable case has a `reference_answer`, the short answer the correctness judge compares with (EVL-045). They were drafted by an AI agent (Claude) from the relevant quotes and the official fact sheets; the maintainer approved adding them without a line-by-line review. Treat them as provisional until a person checks each one.

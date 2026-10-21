@@ -59,3 +59,7 @@ soundline eval run evals/logement-fr/dataset.jsonl --name e5-large
 - the remaining verdicts were proposed by an AI agent (Claude) and kept after that review.
 
 24 of the 54 claims are entailed under these rules.
+
+## Reference answers
+
+Each answerable case has a `reference_answer`, the short answer the correctness judge compares with (EVL-045). They were drafted by an AI agent (Claude) from the relevant quotes and the official fact sheets; the maintainer approved adding them without a line-by-line review. Treat them as provisional until a person checks each one.
