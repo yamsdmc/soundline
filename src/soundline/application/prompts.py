@@ -169,7 +169,7 @@ def _escaped(text: str) -> str:
     return text
 
 
-DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v5")
+DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v6")
 CONDENSE_PROMPT = PromptTemplate.packaged("condense-v1", CONDENSE_PLACEHOLDERS)
 FAITHFULNESS_PROMPT = PromptTemplate.packaged("faithfulness-v3", FAITHFULNESS_PLACEHOLDERS)
 CORRECTNESS_PROMPT = PromptTemplate.packaged("correctness-v1", CORRECTNESS_PLACEHOLDERS)
