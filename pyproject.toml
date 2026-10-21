@@ -42,6 +42,9 @@ anthropic = [
 openai = [
     "openai>=1.50",
 ]
+mcp = [
+    "mcp>=1.10",
+]
 
 [dependency-groups]
 dev = [

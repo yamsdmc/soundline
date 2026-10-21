@@ -83,6 +83,13 @@ soundline eval gate latest --baseline main --rules gates.toml   # exit 1 on a si
 
 Soundline can be used as a **Python library**, a **CLI**, and an **MCP server** for agents.
 
+```bash
+pip install "soundline[mcp]"
+claude mcp add soundline -- soundline mcp --description "Our lease contracts"
+```
+
+The MCP server is read-only: agents get `search` (passages to reason over) and `ask` (one verified answer), with document text returned as labeled, untrusted data.
+
 ## Documentation
 
 - [Specification index](docs/spec/README.md): start here

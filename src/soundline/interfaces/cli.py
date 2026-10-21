@@ -8,7 +8,7 @@ from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, NoReturn, cast
+from typing import TYPE_CHECKING, Annotated, NoReturn, cast
 
 import typer
 
@@ -45,6 +45,9 @@ CONFIGURATION_ERROR = 3
 PROVIDER_UNAVAILABLE = 4
 PARTIAL_SUCCESS = 5
 INTERNAL_ERROR = 10
+
+if TYPE_CHECKING:
+    from mcp.server.mcpserver import MCPServer
 
 app = typer.Typer(no_args_is_help=True, help="The eval-first RAG engine.")
 inspect_app = typer.Typer(no_args_is_help=True, help="Inspect index internals.")
@@ -213,6 +216,27 @@ def ask(
         typer.echo(json.dumps(answer_to_dict(answer)))
         return
     _print_answer(answer)
+
+
+@app.command(help="Serve the index to agents over MCP (stdio, read-only).")
+def mcp(
+    description: Annotated[
+        str, typer.Option(help="What the corpus holds, shown to agents (MCP-004).")
+    ] = "",
+) -> None:
+    try:
+        from soundline.interfaces.mcp_server import (  # noqa: PLC0415  # optional extra
+            build_server,
+        )
+    except ImportError:
+        typer.echo('error: the MCP server needs: pip install "soundline[mcp]"', err=True)
+        raise typer.Exit(CONFIGURATION_ERROR) from None
+    with _soundline() as soundline:
+        serve_stdio(build_server(soundline, description))
+
+
+def serve_stdio(server: "MCPServer") -> None:
+    server.run("stdio")
 
 
 @app.command(help="Converse: follow-ups are understood in context. Ctrl-D or /exit quits.")

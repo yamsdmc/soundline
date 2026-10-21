@@ -361,3 +361,17 @@ def test_ask_open_writes_the_viewer_and_opens_it(
     page = Path(opened[0].removeprefix("file://"))
     assert page.parent == tmp_path / "home" / "views"
     assert "<mark>Rent is due on the 5th</mark>" in page.read_text()
+
+
+@pytest.mark.spec("MCP-003", "MCP-004")
+def test_mcp_serves_the_index_over_stdio_with_a_corpus_description(
+    run: Run, docs: Path, monkeypatch: pytest.MonkeyPatch
+):
+    served: list[object] = []
+    monkeypatch.setattr("soundline.interfaces.cli.serve_stdio", served.append)
+    run("ingest", str(docs))
+
+    result = run("mcp", "--description", "A lease.")
+
+    assert result.exit_code == 0, result.output
+    assert len(served) == 1
