@@ -89,7 +89,7 @@ assert answer.citations[0].quote == "Rent is due on the 5th"
 - Deterministic generation metrics. Judges for faithfulness and correctness, with caching.
 - Unanswerable and adversarial (prompt-injection) datasets.
 - **Trust benchmark** (EVL-092), with results published in the README, whatever they are.
-- **Citation viewer** (`ask --open`, `answer.to_html()`).
+- **Citation viewer** (`ask --open`, `sl.viewer_html(answer)`).
 - MCP server (stdio): `search`, `ask`, `list_corpora`.
 - Documentation site: quickstart, local-only setup, "evaluate your RAG", concepts (why quotes, why RRF, why eval-first).
 

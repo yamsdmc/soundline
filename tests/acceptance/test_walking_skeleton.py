@@ -103,3 +103,16 @@ def test_a_conversation_streams_its_answers_and_remembers_them():
     assert isinstance(second[0], RetrievalCompleted)
     assert second[0].search_query == "late fees for rent"
     assert [turn.question for turn in chat.turns] == ["When is rent due?", "And late fees?"]
+
+
+@pytest.mark.spec("CLI-007")
+def test_an_answer_renders_as_a_self_contained_citation_viewer():
+    llm = ScriptedLanguageModel(answer_citing("Rent is due on the 5th.", "Rent is due on the 5th"))
+    soundline = Soundline.in_memory(llm=llm)
+    soundline.ingest_text("lease.md", "Rent is due on the 5th. Pets are allowed.")
+
+    html = soundline.viewer_html(soundline.ask("When is rent due?"))
+
+    assert html.startswith("<!doctype html>")
+    assert "<h1>When is rent due?</h1>" in html
+    assert "<mark>Rent is due on the 5th</mark>" in html

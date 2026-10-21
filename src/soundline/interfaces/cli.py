@@ -3,8 +3,10 @@
 import json
 import os
 import sys
+import webbrowser
 from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Annotated, NoReturn, cast
 
@@ -54,9 +56,17 @@ JsonOption = Annotated[bool, typer.Option("--json", help="Print one JSON documen
 Paths = Annotated[list[Path], typer.Argument(help="Files and directories.")]
 
 
+def _home() -> Path:
+    return Path(os.environ.get("SOUNDLINE_HOME", ".soundline"))
+
+
+def open_in_browser(url: str) -> None:
+    webbrowser.open(url)
+
+
 @contextmanager
 def _soundline() -> Generator[Soundline]:
-    home = os.environ.get("SOUNDLINE_HOME", ".soundline")
+    home = _home()
     embedder = os.environ.get("SOUNDLINE_EMBEDDER", DEFAULT_EMBEDDER)
     llm_spec = os.environ.get("SOUNDLINE_LLM")
     try:
@@ -182,9 +192,20 @@ def inspect_manifest(as_json: JsonOption = False) -> None:
 
 
 @app.command(help="A grounded answer whose every claim cites a verified quote.")
-def ask(question: str, as_json: JsonOption = False) -> None:
+def ask(
+    question: str,
+    as_json: JsonOption = False,
+    open_viewer: Annotated[
+        bool, typer.Option("--open", help="Open the answer next to its highlighted sources.")
+    ] = False,
+) -> None:
     with _soundline() as soundline:
         answer = soundline.ask(question)
+        if open_viewer:  # CLI-007
+            page = _home() / "views" / datetime.now(UTC).strftime("answer-%Y%m%d-%H%M%S.html")
+            page.parent.mkdir(parents=True, exist_ok=True)
+            page.write_text(soundline.viewer_html(answer), encoding="utf-8")
+            open_in_browser(page.resolve().as_uri())
     if answer.usage.stages:
         typer.echo(_usage_line(answer.usage), err=True)  # GEN-070, on stderr (CLI-002)
     if as_json:

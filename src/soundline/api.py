@@ -176,6 +176,14 @@ class Soundline:
             delete_missing=True,
         )
 
+    def viewer_html(self, answer: Answer) -> str:
+        """The citation viewer: a self-contained page, each claim next to its highlighted
+        sources (CLI-007)."""
+        from soundline.interfaces.viewer import render_viewer  # noqa: PLC0415
+
+        question = answer.query.question if answer.query else ""
+        return render_viewer(question, answer, self.document_text)
+
     def document_text(self, source: str) -> str:
         """The normalized text that chunk and citation spans refer to."""
         document = self._documents.get(source)

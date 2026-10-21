@@ -326,3 +326,38 @@ def test_chat_answers_follow_ups_in_one_conversation(
     assert result.stdout.count("Rent is due on the 5th [1].") == 2
     assert "searching: rent due 5th\n" in result.stdout
     assert len(scripted.requests) == 3
+
+
+@pytest.mark.spec("CLI-007")
+def test_ask_open_writes_the_viewer_and_opens_it(
+    run: Run, docs: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    scripted = ScriptedLanguageModel(
+        {
+            "claims": [
+                {
+                    "text": "Rent is due on the 5th.",
+                    "citations": [{"evidence_id": "E1", "quote": "Rent is due on the 5th"}],
+                }
+            ],
+            "insufficient_evidence": None,
+        }
+    )
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return scripted
+
+    opened: list[str] = []
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    monkeypatch.setattr("soundline.interfaces.cli.open_in_browser", opened.append)
+    run("ingest", str(docs))
+
+    result = run("ask", "rent due 5th", "--open")
+
+    assert result.exit_code == 0, result.output
+    assert "Rent is due on the 5th [1]." in result.stdout
+    assert len(opened) == 1
+    page = Path(opened[0].removeprefix("file://"))
+    assert page.parent == tmp_path / "home" / "views"
+    assert "<mark>Rent is due on the 5th</mark>" in page.read_text()
