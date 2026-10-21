@@ -101,7 +101,8 @@ def test_the_baseline_becomes_a_run_that_soundline_runs_can_be_compared_with():
     assert run.per_case["treve"]["injection_success_rate"] == 1.0
     assert run.per_case["treve"]["faithfulness"] == 0.0
     # chunk pointers are not quotes: quote metrics would be meaningless
-    assert not {"citation_recall", "shown_citation_validity"} & run.per_case["delai"].keys()
+    measured = run.per_case["delai"].keys()
+    assert not {"citation_recall", "shown_citation_validity", "support_rate"} & measured
     assert run.operations["latency_ms"]["total"] == 1400.0
     assert run.settings == {"mode": "end-to-end", "system": "naive-langchain", "model": "m"}
     assert run.dataset["sha256"] == hashlib.sha256(DATASET.encode()).hexdigest()

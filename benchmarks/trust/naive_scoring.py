@@ -64,7 +64,12 @@ def _claim(sentence: str, context: Sequence[Mapping[str, str]]) -> Claim:
     return Claim(_MARKER.sub("", sentence), tuple(citations))
 
 
-_QUOTE_METRICS = ("citation_recall", "shown_citation_validity", "shown_support_rate")
+_QUOTE_METRICS = (
+    "citation_recall",
+    "shown_citation_validity",
+    "shown_support_rate",
+    "support_rate",
+)
 _OPERATIONS = ("latency_ms", "tokens_in", "tokens_out")
 
 
