@@ -39,6 +39,8 @@ class FaithfulnessJudge:
 
     def judge(self, claim: Claim) -> Judgment | None:
         """None when the verdict cannot be read: no judgment rather than a guess."""
+        if not claim.citations:  # nothing cited can entail it (GEN-080 shows such claims)
+            return Judgment(False, "no citation")
         generation = self._llm.generate(faithfulness_request(self._prompt, claim))
         self.usage += generation.usage
         try:
