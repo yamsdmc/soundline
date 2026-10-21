@@ -48,3 +48,14 @@ CONDENSE_FORMAT = OutputFormat(
         "additionalProperties": False,
     },
 )
+
+# A judge's verdict on one claim, rationale first so the verdict follows it (EVL-040).
+FAITHFULNESS_FORMAT = OutputFormat(
+    "faithfulness_verdict",
+    {
+        "type": "object",
+        "properties": {"rationale": {"type": "string"}, "entailed": {"type": "boolean"}},
+        "required": ["rationale", "entailed"],
+        "additionalProperties": False,
+    },
+)

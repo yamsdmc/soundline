@@ -13,8 +13,13 @@ from pathlib import Path
 from string import Template
 from typing import Self
 
-from soundline.application.answer_format import ANSWER_FORMAT, CONDENSE_FORMAT
+from soundline.application.answer_format import (
+    ANSWER_FORMAT,
+    CONDENSE_FORMAT,
+    FAITHFULNESS_FORMAT,
+)
 from soundline.application.ports import GenerationRequest
+from soundline.domain.answers import Claim
 from soundline.domain.chunks import Chunk
 from soundline.domain.conversation import Turn
 from soundline.domain.errors import ConfigurationError
@@ -22,6 +27,7 @@ from soundline.domain.languages import detect_language, language_name
 
 GROUNDED_PLACEHOLDERS = ("history", "evidence", "question", "language_instruction")
 CONDENSE_PLACEHOLDERS = ("history", "question")
+FAITHFULNESS_PLACEHOLDERS = ("claim", "quotes")
 
 
 @dataclass(frozen=True)
@@ -61,7 +67,7 @@ def grounded_request(
     history: Sequence[Turn] = (),
 ) -> GenerationRequest:
     blocks = "\n".join(
-        f'<evidence id="{evidence_id}" source="{chunk.source}">\n'
+        f'<evidence id="{evidence_id}" source="{_attribute(chunk.source)}">\n'
         f"{_escaped(chunk.text)}\n</evidence>"
         for evidence_id, chunk in evidence.items()
     )
@@ -86,6 +92,18 @@ def condense_request(
     """Rewrites a follow-up into a standalone search query (RET-071)."""
     user = template.user.substitute(history=_history(history), question=question)
     return GenerationRequest(template.system, user, CONDENSE_FORMAT)
+
+
+def faithfulness_request(template: PromptTemplate, claim: Claim) -> GenerationRequest:
+    """One claim against its cited quotes only, each with its section (EVL-041)."""
+    quotes = "\n".join(
+        f'<quote source="{_attribute(citation.source)}"'
+        f' section="{_attribute(" > ".join(citation.section_path))}">\n'
+        f"{_escaped(citation.quote)}\n</quote>"
+        for citation in claim.citations
+    )
+    user = template.user.substitute(claim=_escaped(claim.text), quotes=quotes)
+    return GenerationRequest(template.system, user, FAITHFULNESS_FORMAT)
 
 
 def _history(turns: Sequence[Turn]) -> str:
@@ -118,7 +136,13 @@ def _text(directory: Traversable, name: str) -> str:
         raise ConfigurationError(f"prompt template {name} not found in {directory}") from error
 
 
-_TAGS = ("evidence", "history", "turn")
+_TAGS = ("evidence", "history", "turn", "claim", "quote")
+
+
+def _attribute(value: str) -> str:
+    """Source names and section titles come from documents: they cannot leave their
+    attribute (SEC-001)."""
+    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
 
 
 def _escaped(text: str) -> str:
@@ -130,3 +154,4 @@ def _escaped(text: str) -> str:
 
 DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v3")
 CONDENSE_PROMPT = PromptTemplate.packaged("condense-v1", CONDENSE_PLACEHOLDERS)
+FAITHFULNESS_PROMPT = PromptTemplate.packaged("faithfulness-v1", FAITHFULNESS_PLACEHOLDERS)

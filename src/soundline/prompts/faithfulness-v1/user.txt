@@ -1,0 +1,7 @@
+<claim>
+$claim
+</claim>
+
+$quotes
+
+Respond with JSON only: {"rationale": "<one or two sentences>", "entailed": true or false}
