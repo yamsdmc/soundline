@@ -25,6 +25,10 @@ class EvalRun:
     per_case: Mapping[str, Mapping[str, float]]
     metrics: Mapping[str, Estimate]
     warnings: list[str] = field(default_factory=list[str])
+    operations: Mapping[str, Mapping[str, float]] = field(
+        default_factory=dict[str, Mapping[str, float]]
+    )
+    """Latency, tokens and cost: mean, p50, p95 and total over cases (EVL-030)."""
 
     def to_dict(self) -> dict[str, object]:
         data = asdict(self)
@@ -43,6 +47,7 @@ class EvalRun:
             per_case=data["per_case"],
             metrics={name: Estimate(**value) for name, value in data["metrics"].items()},
             warnings=list(data.get("warnings", [])),
+            operations=data.get("operations", {}),
         )
 
 

@@ -9,7 +9,7 @@ from typing import Self
 
 from soundline.application.ask import GenerationSettings, ask, ask_stream
 from soundline.application.diagnostics import Check, diagnose
-from soundline.application.evaluate import DatasetFile, EvalSettings, run_retrieval_eval
+from soundline.application.evaluate import DatasetFile, EvalSettings, Generator, run_eval
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
 from soundline.application.ingest_sources import ingest_sources
@@ -200,17 +200,30 @@ class Soundline:
         ks: Sequence[int] = (1, 3, 5, 10),
         *,
         allow_missing_sources: bool = False,
+        retrieval_only: bool = False,
     ) -> EvalRun:
-        """Retrieval-only evaluation of a JSONL dataset; the run is stored (EVL-060, EVL-062)."""
+        """Evaluates a JSONL dataset and stores the run (EVL-060): end to end when a language
+        model is configured, retrieval-only otherwise or on request (EVL-062)."""
         check_pipeline(self._index.manifest, self._manifest)
         if not Path(dataset).is_file():
             raise DatasetError(f"dataset file not found: {dataset}")
-        run = run_retrieval_eval(
+        generator = None
+        if self._llm is not None and not retrieval_only:
+            generator = Generator(
+                self.ask,
+                {
+                    "model": self._llm.model_id,
+                    "prompt_version": self._generation.prompt.version,
+                    "k": self._generation.k,
+                },
+            )
+        run = run_eval(
             name or datetime.now(UTC).strftime("run-%Y%m%d-%H%M%S"),
             DatasetFile(str(dataset), Path(dataset).read_text(encoding="utf-8")),
             self._index,
             self._retriever.hits,
             EvalSettings(tuple(ks), allow_missing_sources),
+            generator=generator,
         )
         self._runs.save(run)
         return run

@@ -3,17 +3,20 @@
 import difflib
 import hashlib
 import re
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 
 from soundline.application.ports import DocumentStore, Index
+from soundline.domain.answers import Answer
 from soundline.domain.datasets import Dataset, DatasetError, RelevantQuote, parse_dataset
-from soundline.domain.evaluation import Located, retrieval_metrics
+from soundline.domain.evaluation import Located, generation_metrics, retrieval_metrics
 from soundline.domain.hits import Hit
 from soundline.domain.quotes import Span
 from soundline.domain.runs import EvalRun, aggregate
+from soundline.domain.statistics import describe
 
 _SENTENCE = re.compile(r"[^.!?\n]+[.!?]?")
 
@@ -88,27 +91,52 @@ class EvalSettings:
     allow_missing_sources: bool = False
 
 
-def run_retrieval_eval(
+@dataclass(frozen=True)
+class Generator:
+    """What an end-to-end run calls on each question, and how to describe it in the run."""
+
+    answer: Callable[[str], Answer]
+    settings: Mapping[str, object]
+    """Recorded in the run: model ID, prompt version (EVL-060)."""
+
+
+_OPERATIONS = ("latency_ms", "tokens_in", "tokens_out", "cost_usd")
+
+
+def run_eval(  # noqa: PLR0913  # keyword-only collaborators
     name: str,
     dataset_file: DatasetFile,
     index: Index,
     search: Callable[[str, int], list[Hit]],
     settings: EvalSettings,
+    *,
+    generator: Generator | None = None,
+    clock: Callable[[], float] = time.perf_counter,
 ) -> EvalRun:
-    """Searches every answerable question and scores the hits (EVL-060, EVL-062).
-    Retrieval-only: no language model, deterministic, cheap enough for every commit."""
+    """Scores retrieval on answerable cases and, with a generator, every answer end to end
+    (EVL-060). Without one, the run is retrieval-only: no model call, deterministic, cheap
+    enough for every commit (EVL-062)."""
     dataset = parse_dataset(dataset_file.text.splitlines())
     quotes = resolve_dataset(
         dataset, index.documents, allow_missing_sources=settings.allow_missing_sources
     )
     per_case: dict[str, dict[str, float]] = {}
     for case in dataset.cases:
-        if not case.answerable:
-            continue  # retrieval metrics need relevant quotes (EVL-003)
-        hits = search(case.question, max(settings.ks))
-        located = [Located(hit.source, hit.chunk.span) for hit in hits]
-        per_case[case.id] = retrieval_metrics(quotes[case.id], located, settings.ks)
+        metrics: dict[str, float] = {}
+        if case.answerable:  # retrieval metrics need relevant quotes (EVL-003)
+            hits = search(case.question, max(settings.ks))
+            located = [Located(hit.source, hit.chunk.span) for hit in hits]
+            metrics.update(retrieval_metrics(quotes[case.id], located, settings.ks))
+        if generator is not None:
+            started = clock()
+            answer = generator.answer(case.question)
+            latency_ms = (clock() - started) * 1000
+            metrics.update(generation_metrics(answer, quotes.get(case.id, []), case.answerable))
+            metrics.update(_operational(answer, latency_ms))
+        if metrics:
+            per_case[case.id] = metrics
     manifest = index.manifest.load()
+    mode = {"mode": "end-to-end", **generator.settings} if generator else {"mode": "retrieval-only"}
     return EvalRun(
         name=name,
         created_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -121,7 +149,25 @@ def run_retrieval_eval(
             "fingerprint": manifest.fingerprint if manifest else None,
             "components": dict(manifest.components) if manifest else {},
         },
-        settings={"ks": list(settings.ks), "mode": "retrieval-only"},
+        settings={"ks": list(settings.ks), **mode},
         per_case=per_case,
         metrics=aggregate(per_case),
+        operations={
+            metric: describe([m[metric] for m in per_case.values() if metric in m])
+            for metric in _OPERATIONS
+            if any(metric in m for m in per_case.values())
+        },
     )
+
+
+def _operational(answer: Answer, latency_ms: float) -> dict[str, float]:
+    """Latency includes retrieval and verification: the cost of trust is visible (EVL-030)."""
+    tokens = answer.usage.tokens
+    metrics = {
+        "latency_ms": latency_ms,
+        "tokens_in": float(tokens.total_input),
+        "tokens_out": float(tokens.output),
+    }
+    if answer.usage.cost_usd is not None:
+        metrics["cost_usd"] = answer.usage.cost_usd
+    return metrics

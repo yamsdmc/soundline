@@ -2,7 +2,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from soundline.domain.statistics import Verdict, bootstrap_mean, compare_paired
+from soundline.domain.statistics import Verdict, bootstrap_mean, compare_paired, describe
 
 SCORES = {f"case-{i}": value for i, value in enumerate([1, 0, 1, 1, 0, 1, 1, 1, 0, 1])}
 
@@ -72,3 +72,11 @@ def test_results_do_not_depend_on_case_order(scores: dict[str, float]):
     reversed_order = dict(reversed(list(scores.items())))
 
     assert bootstrap_mean(scores, resamples=200) == bootstrap_mean(reversed_order, resamples=200)
+
+
+@pytest.mark.spec("EVL-030")
+def test_operational_metrics_are_summarized_by_mean_percentiles_and_total():
+    summary = describe([float(n) for n in range(1, 101)])
+
+    assert summary == {"mean": 50.5, "p50": 50.5, "p95": pytest.approx(95.05), "total": 5050.0}
+    assert describe([]) == {"mean": 0.0, "p50": 0.0, "p95": 0.0, "total": 0.0}

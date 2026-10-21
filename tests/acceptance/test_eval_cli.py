@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from soundline.interfaces.cli import app
+from soundline.testing import ScriptedLanguageModel
 
 type Run = Callable[..., Result]
 
@@ -147,3 +148,53 @@ def test_an_invalid_dataset_is_a_usage_error(
 
     assert result.exit_code == 2
     assert "closest" in result.output
+
+
+def abstaining_model() -> ScriptedLanguageModel:
+    answer: dict[str, object] = {"claims": [], "insufficient_evidence": "not in the lease"}
+    return ScriptedLanguageModel(*[answer] * len(TOPICS))
+
+
+@pytest.mark.spec("EVL-060", "EVL-030", "EVL-053")
+def test_with_a_language_model_eval_run_is_end_to_end_and_reports_operations(
+    tmp_path: Path, corpus: Path, dataset: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run = runner_for(tmp_path / "home", monkeypatch)
+    run("ingest", str(corpus))
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+    model = abstaining_model()
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return model
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+
+    result = run("eval", "run", str(dataset))
+
+    assert result.exit_code == 0, result.output
+    assert "end-to-end" in result.stdout
+    assert "answer_rate" in result.stdout
+    assert "n=12" in result.stdout
+    assert "latency_ms" in result.stdout
+    assert len(model.requests) == 12
+
+
+@pytest.mark.spec("EVL-062")
+def test_retrieval_only_skips_the_configured_language_model(
+    tmp_path: Path, corpus: Path, dataset: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run = runner_for(tmp_path / "home", monkeypatch)
+    run("ingest", str(corpus))
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+    model = ScriptedLanguageModel()
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return model
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+
+    result = run("eval", "run", str(dataset), "--retrieval-only")
+
+    assert result.exit_code == 0, result.output
+    assert "retrieval-only" in result.stdout
+    assert model.requests == []

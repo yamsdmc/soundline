@@ -6,7 +6,7 @@ order cases were run in (INV-EVL-4).
 
 import math
 import random
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -74,3 +74,25 @@ def compare_paired(
     baseline = bootstrap_mean({c: before[c] for c in shared}, resamples, seed)
     too_few = (baseline.high - baseline.low) / 2 > tolerance
     return Comparison(difference, verdict, too_few)
+
+
+def describe(values: Sequence[float]) -> dict[str, float]:
+    """Mean, median, 95th percentile (linear interpolation) and total, for operational
+    metrics such as latency and cost (EVL-030)."""
+    if not values:
+        return {"mean": 0.0, "p50": 0.0, "p95": 0.0, "total": 0.0}
+    ordered = sorted(values)
+    total = math.fsum(ordered)
+    return {
+        "mean": total / len(ordered),
+        "p50": _percentile(ordered, 0.5),
+        "p95": _percentile(ordered, 0.95),
+        "total": total,
+    }
+
+
+def _percentile(ordered: Sequence[float], fraction: float) -> float:
+    position = fraction * (len(ordered) - 1)
+    below = math.floor(position)
+    above = min(below + 1, len(ordered) - 1)
+    return ordered[below] + (ordered[above] - ordered[below]) * (position - below)

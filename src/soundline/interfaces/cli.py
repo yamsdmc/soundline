@@ -260,16 +260,36 @@ def eval_run(
         bool,
         typer.Option(help="Score quotes from documents absent from the index as misses."),
     ] = False,
+    retrieval_only: Annotated[
+        bool, typer.Option(help="Search only; never call the language model (EVL-062).")
+    ] = False,
     as_json: JsonOption = False,
 ) -> None:
     with _soundline() as soundline:
-        run = soundline.evaluate(dataset, name, allow_missing_sources=allow_missing_sources)
+        run = soundline.evaluate(
+            dataset,
+            name,
+            allow_missing_sources=allow_missing_sources,
+            retrieval_only=retrieval_only,
+        )
     if as_json:
         typer.echo(json.dumps(run.to_dict()))
         return
-    typer.echo(f"run {run.name}: {run.dataset['cases']} cases, 95% bootstrap intervals")
+    mode = run.settings.get("mode")
+    model = f", model {run.settings['model']}" if "model" in run.settings else ""
+    typer.echo(f"run {run.name} ({mode}{model}): {run.dataset['cases']} cases")
+    typer.echo("metrics, 95% bootstrap intervals over the cases that define them:")
+    width = max((len(metric) for metric in run.metrics), default=0)
     for metric, estimate in run.metrics.items():
-        typer.echo(f"  {metric:<13} {estimate.mean:.3f}  [{estimate.low:.3f}, {estimate.high:.3f}]")
+        typer.echo(
+            f"  {metric:<{width}} {estimate.mean:.3f}  [{estimate.low:.3f}, {estimate.high:.3f}]"
+            f"  n={estimate.cases}"  # EVL-053
+        )
+    if run.operations:
+        typer.echo("operations (mean, p50, p95, total):")  # EVL-030
+        for metric, summary in run.operations.items():
+            values = ", ".join(f"{summary[key]:,.4g}" for key in ("mean", "p50", "p95", "total"))
+            typer.echo(f"  {metric:<{width}} {values}")
 
 
 @eval_app.command("compare", help="Paired comparison of two runs on the same dataset.")
