@@ -73,7 +73,7 @@ def render_viewer(question: str, answer: Answer, document_text: Callable[[str], 
             markers = "".join(f"[{n}]" for n in refs)
             sentences.append(
                 f'<span class="claim" data-refs="{" ".join(map(str, refs))}">'
-                f'{escape(claim.text)} <span class="refs">{markers}</span></span>'
+                f'{escape(claim.shown_text)} <span class="refs">{markers}</span></span>'
             )
         left.append(f"<p>{' '.join(sentences)}</p>")
         left += [f'<p class="conflict">{escape(line)}</p>' for line in conflict_lines(answer)]

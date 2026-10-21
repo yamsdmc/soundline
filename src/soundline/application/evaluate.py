@@ -260,7 +260,7 @@ def judge_correctness(
     if answer.status is AnswerStatus.ABSTAINED or not answer.claims:
         return None
     before = judge.usage
-    judgment = judge.judge(question, reference, " ".join(claim.text for claim in answer.claims))
+    judgment = judge.judge(question, reference, " ".join(c.shown_text for c in answer.claims))
     spent = judge.usage - before
     metrics["judge_tokens_in"] = metrics.get("judge_tokens_in", 0.0) + spent.total_input
     metrics["judge_tokens_out"] = metrics.get("judge_tokens_out", 0.0) + spent.output

@@ -95,6 +95,7 @@ def test_the_json_form_lists_claims_with_their_citations_and_the_proposed_count(
     assert data["claims"] == [
         {
             "text": "Rent is due on the 5th.",
+            "conditions": [],
             "citations": [
                 {
                     "source": "lease.md",

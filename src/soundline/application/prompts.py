@@ -105,7 +105,7 @@ def faithfulness_request(template: PromptTemplate, claim: Claim) -> GenerationRe
         f"{_escaped(citation.quote)}\n</quote>"
         for citation in claim.citations
     )
-    user = template.user.substitute(claim=_escaped(claim.text), quotes=quotes)
+    user = template.user.substitute(claim=_escaped(claim.shown_text), quotes=quotes)  # GEN-096
     return GenerationRequest(template.system, user, FAITHFULNESS_FORMAT)
 
 

@@ -120,6 +120,14 @@ Verification proves that a source says something, not that the source is right. 
 - **GEN-092** Conflicts MUST be shown with the answer: the CLI prints `Sources disagree on <about>: [n] [m]` after the answer text, the JSON output lists them (`about` and the citation numbers), and the citation viewer (CLI-007) marks them. Conflicts never change the claims or the status.
 - **GEN-093** A missing or malformed `conflicts` field is read as no conflict: it never makes an answer invalid (GEN-020).
 
+### Conditions of a section
+
+A quote's section is part of its meaning (EVL-041): "the notice is 3 months" under "Logement vide > Vous vivez seul" is a rule for one case. The trust benchmark showed claims dropping such conditions. The prompt asks the model to keep them; the code makes sure the answer shows them.
+
+- **GEN-094** A section heading is a **condition** of a claim when every citation of the claim lies under it and the evidence contains, in the same document, a **sibling** section: same parent, another heading at that level ("Logement meublé" next to "Logement vide").
+- **GEN-095** A condition is **named** by the claim when the claim contains one of the words that distinguish the heading from its siblings (case and accents ignored): "vide" for "Logement vide" against "Logement meublé". An unnamed condition is attached to the claim and rendered with it, after the claim text and before its markers: `The notice is 3 months (Logement vide) [1].` The claim text itself is unchanged; the JSON output lists the claim's `conditions`.
+- **GEN-096** Judges see a claim as it is shown, conditions included (EVL-041, EVL-045).
+
 ## Invariants
 
 - **INV-GEN-1** Every citation in an `ANSWERED` or `PARTIAL` answer has a quote that is a substring of its document's normalized text at its resolved span: `doc.normalized_text[c.start:c.end] == c.quote`.

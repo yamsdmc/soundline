@@ -44,6 +44,16 @@ class Citation:
 class Claim:
     text: str
     citations: tuple[Citation, ...]
+    conditions: tuple[str, ...] = ()
+    """Section headings the claim holds under but does not name, shown with it (GEN-095)."""
+
+    @property
+    def shown_text(self) -> str:
+        """The claim as the user reads it, its conditions included (GEN-096)."""
+        if not self.conditions:
+            return self.text
+        body = self.text.rstrip(_CLOSING_PUNCTUATION)
+        return f"{body} ({', '.join(self.conditions)}){self.text[len(body) :]}"
 
 
 @dataclass(frozen=True)
@@ -123,11 +133,12 @@ def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
             if citation not in numbered:
                 numbered.append(citation)
         markers = "".join(f"[{numbered.index(c) + 1}]" for c in claim.citations)
+        shown = claim.shown_text
         if not markers:  # only with verification disabled (GEN-080)
-            sentences.append(claim.text)
+            sentences.append(shown)
             continue
-        body = claim.text.rstrip(_CLOSING_PUNCTUATION)
-        closing = claim.text[len(body) :]
+        body = shown.rstrip(_CLOSING_PUNCTUATION)
+        closing = shown[len(body) :]
         sentences.append(f"{body} {markers}{closing}")
     return " ".join(sentences), numbered
 
@@ -149,7 +160,11 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
         "text": answer.text,
         "citations": [_citation_to_dict(c) for c in answer.citations],
         "claims": [
-            {"text": claim.text, "citations": [_citation_to_dict(c) for c in claim.citations]}
+            {
+                "text": claim.text,
+                "conditions": list(claim.conditions),
+                "citations": [_citation_to_dict(c) for c in claim.citations],
+            }
             for claim in answer.claims
         ],
         "citations_proposed": answer.citations_proposed,

@@ -64,3 +64,14 @@ def test_an_abstention_says_why():
     html = render_viewer("Is parking free?", abstained, no_documents.__getitem__)
 
     assert "nothing about parking" in html
+
+
+@pytest.mark.spec("CLI-007", "GEN-095")
+def test_a_claim_is_shown_with_its_conditions():
+    claim = Claim("Rent is due on the 5th.", (RENT,), conditions=("Furnished",))
+    text, citations = render([claim])
+    answered = Answer(AnswerStatus.ANSWERED, text=text, citations=citations, claims=(claim,))
+
+    html = render_viewer("When?", answered, {"lease.md": TEXT}.__getitem__)
+
+    assert "Rent is due on the 5th (Furnished)." in html

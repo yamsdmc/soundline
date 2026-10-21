@@ -26,6 +26,7 @@ from soundline.domain.answers import (
     render,
 )
 from soundline.domain.chunks import Chunk
+from soundline.domain.conditions import missing_conditions
 from soundline.domain.conversation import Turn, pack_history
 from soundline.domain.errors import GenerationError, ProviderUnavailableError, SoundlineError
 from soundline.domain.events import (
@@ -118,7 +119,11 @@ def ask_stream(
             return
         request = grounded_request(settings.prompt, question, evidence, packed.turns)
         output = _generate(calls, request)
-        verified = [_verified(claim, evidence, settings.verify) for claim in output.claims]
+        chunks = list(evidence.values())
+        verified = [
+            replace(claim, conditions=missing_conditions(claim, chunks))  # GEN-095
+            for claim in (_verified(c, evidence, settings.verify) for c in output.claims)
+        ]
         if output.insufficient_evidence is None:
             for claim in verified:
                 if claim.citations:
