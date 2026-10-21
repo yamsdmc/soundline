@@ -8,6 +8,7 @@ from typing import Protocol
 from soundline.domain.chunks import Chunk
 from soundline.domain.filters import Filter
 from soundline.domain.manifest import Manifest
+from soundline.domain.runs import EvalRun
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,14 @@ class SourceReader(Protocol):
         ...
 
     def read(self, uri: str) -> bytes: ...
+
+
+class RunStore(Protocol):
+    def save(self, run: EvalRun) -> str:
+        """Returns where the run was stored."""
+        ...
+
+    def load(self, name_or_path: str) -> EvalRun: ...
 
 
 class ManifestStore(Protocol):

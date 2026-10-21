@@ -1,28 +1,32 @@
 """The public Python API, and the composition root that wires adapters to ports (ARC-006)."""
 
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Self
 
 from soundline.application.ask import ask
 from soundline.application.diagnostics import Check, diagnose
+from soundline.application.evaluate import DatasetFile, EvalSettings, run_retrieval_eval
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
 from soundline.application.ingest_sources import ingest_sources
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
-from soundline.application.ports import Embedder, Index, LanguageModel, SourceReader
+from soundline.application.ports import Embedder, Index, LanguageModel, RunStore, SourceReader
 from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.errors import ConfigurationError
 from soundline.domain.filters import Filter, Metadata, parse_filter
 from soundline.domain.hits import Hit, SearchResult
 from soundline.domain.manifest import Manifest
+from soundline.domain.runs import EvalRun
 from soundline.testing import (
     HashingEmbedder,
     InMemoryDocumentStore,
     InMemoryIndex,
     InMemoryManifestStore,
+    InMemoryRunStore,
     InMemoryVectorIndex,
 )
 
@@ -36,6 +40,7 @@ class Soundline:
         chunking: ChunkingSettings | None = None,
         *,
         reader: SourceReader | None = None,
+        runs: RunStore | None = None,
     ) -> None:
         chunking = chunking or ChunkingSettings()
         self._index = index
@@ -46,6 +51,7 @@ class Soundline:
         self._retriever = HybridRetriever(index.lexical, index.dense, embedder)
         self._llm = llm
         self._reader = reader or _local_files()
+        self._runs = runs or InMemoryRunStore()
 
     @classmethod
     def open(
@@ -77,7 +83,9 @@ class Soundline:
             close=database.close,
             describe=lambda: describe_database(database),
         )
-        return cls(index, embedder, llm, chunking)
+        from soundline.adapters.evals.json_files import JsonRunStore  # noqa: PLC0415
+
+        return cls(index, embedder, llm, chunking, runs=JsonRunStore(Path(home) / "evals" / "runs"))
 
     def __enter__(self) -> Self:
         return self
@@ -155,6 +163,29 @@ class Soundline:
                 "asking needs a language model; configure one (generation.model) or use search"
             )
         return ask(question, self._retriever, self._llm)
+
+    def evaluate(
+        self,
+        dataset: str | Path,
+        name: str | None = None,
+        ks: Sequence[int] = (1, 3, 5, 10),
+        *,
+        allow_missing_sources: bool = False,
+    ) -> EvalRun:
+        """Retrieval-only evaluation of a JSONL dataset; the run is stored (EVL-060, EVL-062)."""
+        check_pipeline(self._index.manifest, self._manifest)
+        run = run_retrieval_eval(
+            name or datetime.now(UTC).strftime("run-%Y%m%d-%H%M%S"),
+            DatasetFile(str(dataset), Path(dataset).read_text(encoding="utf-8")),
+            self._index,
+            self._retriever.hits,
+            EvalSettings(tuple(ks), allow_missing_sources),
+        )
+        self._runs.save(run)
+        return run
+
+    def load_run(self, name_or_path: str) -> EvalRun:
+        return self._runs.load(name_or_path)
 
     def diagnose(self) -> list[Check]:
         """Checks storage, embedder and index compatibility with real calls (CLI-005)."""

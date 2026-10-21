@@ -89,6 +89,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR0913"]
+"src/soundline/api.py" = ["PLR0913"]  # the composition root takes one dependency per port
 
 # --- Types -------------------------------------------------------------------
 

@@ -13,8 +13,16 @@ import typer
 from soundline import Soundline
 from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec
 from soundline.application.ingest import IngestionReport, IngestionStatus
+from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import ConfigurationError, IndexMismatchError, SoundlineError
 from soundline.domain.filters import InvalidFilterError
+from soundline.domain.runs import (
+    RunMismatchError,
+    compare_runs,
+    comparison_markdown,
+    gate,
+    parse_rules,
+)
 
 # Exit codes (CLI-001)
 USAGE_ERROR = 2
@@ -24,6 +32,9 @@ PARTIAL_SUCCESS = 5
 app = typer.Typer(no_args_is_help=True, help="The eval-first RAG engine.")
 inspect_app = typer.Typer(no_args_is_help=True, help="Inspect index internals.")
 app.add_typer(inspect_app, name="inspect")
+eval_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality.")
+app.add_typer(eval_app, name="eval")
+CHECK_FAILED = 1
 
 JsonOption = Annotated[bool, typer.Option("--json", help="Print one JSON document on stdout.")]
 Paths = Annotated[list[Path], typer.Argument(help="Files and directories.")]
@@ -36,7 +47,7 @@ def _soundline() -> Generator[Soundline]:
     try:
         with Soundline.open(home, embedder=embedder_from_spec(embedder)) as soundline:
             yield soundline
-    except InvalidFilterError as error:
+    except (InvalidFilterError, DatasetError, RunMismatchError) as error:
         _fail(error, USAGE_ERROR)
     except (ConfigurationError, IndexMismatchError) as error:
         _fail(error, CONFIGURATION_ERROR)
@@ -136,6 +147,64 @@ def inspect_manifest(as_json: JsonOption = False) -> None:
         typer.echo("{}" if as_json else "empty index: no manifest yet")
         return
     typer.echo(json.dumps(manifest.components, indent=None if as_json else 2, sort_keys=True))
+
+
+@eval_app.command("run", help="Evaluate retrieval on a JSONL dataset and store the run.")
+def eval_run(
+    dataset: Path,
+    name: Annotated[str | None, typer.Option(help="Run name (default: a timestamp).")] = None,
+    allow_missing_sources: Annotated[
+        bool,
+        typer.Option(help="Score quotes from documents absent from the index as misses."),
+    ] = False,
+    as_json: JsonOption = False,
+) -> None:
+    with _soundline() as soundline:
+        run = soundline.evaluate(dataset, name, allow_missing_sources=allow_missing_sources)
+    if as_json:
+        typer.echo(json.dumps(run.to_dict()))
+        return
+    typer.echo(f"run {run.name}: {run.dataset['cases']} cases, 95% bootstrap intervals")
+    for metric, estimate in run.metrics.items():
+        typer.echo(f"  {metric:<13} {estimate.mean:.3f}  [{estimate.low:.3f}, {estimate.high:.3f}]")
+
+
+@eval_app.command("compare", help="Paired comparison of two runs on the same dataset.")
+def eval_compare(
+    baseline: str,
+    run: str,
+    output: Annotated[str, typer.Option("--format", help="text, md or json.")] = "text",
+) -> None:
+    with _soundline() as soundline:
+        before, after = soundline.load_run(baseline), soundline.load_run(run)
+        if output == "json":
+            comparisons = compare_runs(before, after)
+            typer.echo(
+                json.dumps(
+                    {
+                        m: {"verdict": c.verdict.value, "difference": vars(c.difference)}
+                        for m, c in comparisons.items()
+                    }
+                )
+            )
+        else:
+            typer.echo(comparison_markdown(before, after))
+
+
+@eval_app.command("gate", help="Exit 1 when a rule fails against the baseline (EVL-064).")
+def eval_gate(
+    run: str,
+    baseline: Annotated[str, typer.Option(help="Baseline run name or JSON file.")],
+    rules: Annotated[Path, typer.Option(help="TOML file of [[rule]] entries.")],
+) -> None:
+    with _soundline() as soundline:
+        outcomes = gate(
+            soundline.load_run(baseline), soundline.load_run(run), parse_rules(rules.read_text())
+        )
+    for outcome in outcomes:
+        typer.echo(f"{'pass' if outcome.passed else 'FAIL'}  {outcome.explanation}")
+    if not all(outcome.passed for outcome in outcomes):
+        raise typer.Exit(CHECK_FAILED)
 
 
 def main() -> None:
