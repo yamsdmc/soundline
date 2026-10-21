@@ -26,23 +26,33 @@ def covers(hit: Located, quote: Located, min_overlap: float = 0.5) -> bool:
     return overlap > 0 and overlap >= min_overlap * (quote.span.end - quote.span.start)
 
 
+type Quote = Located | Sequence[Located]
+"""A relevant quote, or every occurrence of it when a document repeats the sentence."""
+
+
 def retrieval_metrics(
-    quotes: Sequence[Located],
+    quotes: Sequence[Quote],
     hits: Sequence[Located],
     ks: Sequence[int] = (1, 3, 5, 10),
     min_overlap: float = 0.5,
 ) -> dict[str, float]:
     """recall@k, hit_rate@k, precision@k, ndcg@k (binary) for each k, and mrr up to max(ks).
 
-    A hit gains only for quotes that no earlier hit covered, so a quote counts once.
+    A hit covers a quote when it covers any of its occurrences. A hit gains only for quotes
+    that no earlier hit covered, so a quote counts once.
     """
+    occurrences = [(q,) if isinstance(q, Located) else tuple(q) for q in quotes]
+
+    def hit_covers(hit: Located, quote: tuple[Located, ...]) -> bool:
+        return any(covers(hit, occurrence, min_overlap) for occurrence in quote)
+
     found: list[set[int]] = []  # quotes each hit newly covers
     seen: set[int] = set()
     for hit in hits:
-        new = {i for i, quote in enumerate(quotes) if covers(hit, quote, min_overlap)} - seen
+        new = {i for i, quote in enumerate(occurrences) if hit_covers(hit, quote)} - seen
         found.append(new)
         seen |= new
-    relevant = [any(covers(hit, quote, min_overlap) for quote in quotes) for hit in hits]
+    relevant = [any(hit_covers(hit, quote) for quote in occurrences) for hit in hits]
 
     metrics: dict[str, float] = {}
     for k in ks:

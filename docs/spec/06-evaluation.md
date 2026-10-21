@@ -31,6 +31,8 @@ A dataset is a **JSONL** file (one case per line) with an optional header file `
 
 - **EVL-001** Relevance MUST be labeled by **quote** (source + exact excerpt), not by chunk ID. This keeps datasets valid across chunking, enrichment and embedding changes.
 - **EVL-002** Loading a dataset MUST validate every case. In particular, each relevant quote MUST be found in the indexed corpus, using the same matching ladder as citation verification (GEN chapter). Unfound quotes are reported as dataset errors, with the closest match as a hint.
+  A quote that a document contains several times (a sentence repeated across variants of a page) resolves to **every** occurrence, and a hit covering any of them covers the quote.
+  > Refined in M4: the first-occurrence rule made correct top-ranked hits count as misses on real pages; found with the `logement-fr` benchmark.
 - **EVL-003** `answerable: false` cases (questions the corpus cannot answer) MUST be supported. They have no relevant quotes. The correct behavior is abstention.
 - **EVL-004** Case IDs MUST be unique and stable. They are the join key for run comparisons.
 - **EVL-005** Datasets MAY specify per-case filters and conversation history, to evaluate filtered search and follow-ups.

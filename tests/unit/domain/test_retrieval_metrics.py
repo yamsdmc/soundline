@@ -82,3 +82,12 @@ def test_aggregated_metrics_are_listed_in_natural_order():
     per_case = {"c": retrieval_metrics([QUOTE_A], [QUOTE_A], ks=(10, 3))}
 
     assert list(aggregate(per_case))[:4] == ["hit_rate@3", "hit_rate@10", "mrr", "ndcg@3"]
+
+
+@pytest.mark.spec("EVL-001")
+def test_a_hit_on_any_occurrence_of_a_quote_counts():
+    first, second = at(100, 120), at(500, 520)
+
+    metrics = retrieval_metrics([(first, second)], [at(495, 525)], ks=(1,))
+
+    assert metrics["hit_rate@1"] == 1.0

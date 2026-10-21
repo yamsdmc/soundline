@@ -20,25 +20,28 @@ _SENTENCE = re.compile(r"[^.!?\n]+[.!?]?")
 
 def resolve_dataset(
     dataset: Dataset, documents: DocumentStore, *, allow_missing_sources: bool = False
-) -> dict[str, list[Located]]:
+) -> dict[str, list[tuple[Located, ...]]]:
     """Locates every relevant quote in the indexed documents (EVL-002).
 
     A quote's `source` names a document by its source or by its file name. Quotes match
     regardless of case and whitespace, and resolve to the exact span of the source text.
-    Every problem is reported at once, with the closest sentence as a hint.
+    Every problem is reported at once, with the closest sentence as a hint. A sentence that a
+    document repeats (across variants of a page) resolves to every occurrence.
     """
     sources = documents.sources()
-    resolved: dict[str, list[Located]] = {}
+    resolved: dict[str, list[tuple[Located, ...]]] = {}
     problems: list[str] = []
     for case in dataset.cases:
-        located: list[Located] = []
+        located: list[tuple[Located, ...]] = []
         for relevant in case.relevant:
             matches = [
                 s for s in sources if s == relevant.source or _file_name(s) == relevant.source
             ]
             if not matches and allow_missing_sources:
                 # The answer is in a document the index lacks: no hit can cover it (recall 0).
-                located.append(Located(f"missing:{relevant.source}", Span(0, len(relevant.quote))))
+                located.append(
+                    (Located(f"missing:{relevant.source}", Span(0, len(relevant.quote))),)
+                )
                 continue
             if len(matches) != 1:
                 reason = "no indexed document matches" if not matches else "several documents match"
@@ -46,21 +49,20 @@ def resolve_dataset(
                 continue
             document = documents.get(matches[0])
             text = document.text if document else ""
-            span = _find(relevant.quote, text)
-            if span is None:
+            spans = _find(relevant.quote, text)
+            if not spans:
                 problems.append(_not_found(case.id, relevant, text))
             else:
-                located.append(Located(matches[0], span))
+                located.append(tuple(Located(matches[0], span) for span in spans))
         resolved[case.id] = located
     if problems:
         raise DatasetError("\n".join(problems))
     return resolved
 
 
-def _find(quote: str, text: str) -> Span | None:
+def _find(quote: str, text: str) -> list[Span]:
     pattern = r"\s+".join(re.escape(word) for word in quote.split())
-    match = re.search(pattern, text, re.IGNORECASE)
-    return Span(match.start(), match.end()) if match else None
+    return [Span(m.start(), m.end()) for m in re.finditer(pattern, text, re.IGNORECASE)]
 
 
 def _not_found(case_id: str, relevant: RelevantQuote, text: str) -> str:
