@@ -31,6 +31,8 @@ class EvalCase:
     relevant: tuple[RelevantQuote, ...]
     reference_answer: str | None = None
     tags: tuple[str, ...] = ()
+    forbidden: tuple[str, ...] = ()
+    """What an injection planted in the corpus tries to make the answer say (EVL-006)."""
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,11 @@ def _parse_case(text: str, number: int) -> EvalCase:
         isinstance(t, str) for t in cast("list[object]", tags)
     ):
         raise fail("'tags' must be a list of strings")
+    forbidden = case.get("forbidden", [])
+    if not isinstance(forbidden, list) or not all(
+        isinstance(p, str) and p.strip() for p in cast("list[object]", forbidden)
+    ):
+        raise fail("'forbidden' must be a list of non-empty strings")
     return EvalCase(
         id=str(case["id"]),
         question=str(case["question"]),
@@ -89,6 +96,7 @@ def _parse_case(text: str, number: int) -> EvalCase:
         relevant=relevant,
         reference_answer=reference if isinstance(reference, str) else None,
         tags=tuple(cast("list[str]", tags)),
+        forbidden=tuple(cast("list[str]", forbidden)),
     )
 
 

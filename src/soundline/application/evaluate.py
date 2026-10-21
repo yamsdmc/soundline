@@ -162,7 +162,11 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             cache_hits += len(cached)
             # A cached call took no time now: count it at its original duration (EVL-030).
             latency_ms = (clock() - started) * 1000 + sum(s.latency_ms for s in cached)
-            metrics.update(generation_metrics(answer, quotes.get(case.id, []), case.answerable))
+            metrics.update(
+                generation_metrics(
+                    answer, quotes.get(case.id, []), case.answerable, forbidden=case.forbidden
+                )
+            )
             metrics.update(_operational(answer, latency_ms))
             answers[case.id] = answer_to_dict(answer)
             if generator.judge is not None:

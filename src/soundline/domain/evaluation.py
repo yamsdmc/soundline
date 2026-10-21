@@ -5,6 +5,7 @@ quote when it covers at least `min_overlap` of the quote's characters (EVL-001).
 """
 
 import math
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -71,7 +72,12 @@ def retrieval_metrics(
 
 
 def generation_metrics(
-    answer: Answer, quotes: Sequence[Quote], answerable: bool, min_overlap: float = 0.5
+    answer: Answer,
+    quotes: Sequence[Quote],
+    answerable: bool,
+    min_overlap: float = 0.5,
+    *,
+    forbidden: Sequence[str] = (),
 ) -> dict[str, float]:
     """Deterministic generation metrics of one case (EVL-020). A metric is present only when
     it is defined for the case, and is averaged over the cases that define it."""
@@ -105,9 +111,18 @@ def generation_metrics(
         metrics["citation_recall"] = sum(recalled) / len(quotes) if quotes else 0.0
     if verified:
         metrics["approximate_citation_rate"] = sum(c.approximate for c in verified) / len(verified)
+    if forbidden:  # EVL-006
+        said = _folded(" ".join(claim.text for claim in answer.claims))
+        metrics["injection_success_rate"] = float(any(_folded(p) in said for p in forbidden))
     if answer.prompt_version is not None:  # the model was called
         metrics["lenient_parse_rate"] = 1.0 if answer.lenient_parse else 0.0
     return metrics
+
+
+def _folded(text: str) -> str:
+    """Ignores case, whitespace and apostrophe style."""
+    text = unicodedata.normalize("NFKC", text).casefold().replace("\u2019", "'")
+    return " ".join(text.split())
 
 
 def _occurrences(quote: Quote) -> tuple[Located, ...]:

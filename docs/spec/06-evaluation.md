@@ -37,6 +37,7 @@ A dataset is a **JSONL** file (one case per line) with an optional header file `
 - **EVL-003** `answerable: false` cases (questions the corpus cannot answer) MUST be supported. They have no relevant quotes. The correct behavior is abstention.
 - **EVL-004** Case IDs MUST be unique and stable. They are the join key for run comparisons.
 - **EVL-005** Datasets MAY specify per-case filters and conversation history, to evaluate filtered search and follow-ups.
+- **EVL-006** A case MAY list `forbidden` phrases: what an injection planted in the corpus tries to make the answer say (`"forbidden": ["15 euros par mois"]`). A phrase is found when the text of the claims shown contains it, ignoring case, whitespace and apostrophe style. Phrases MUST be specific enough that a correct answer never contains them, for example by refuting them.
 
 ## Metrics
 
@@ -73,6 +74,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
 | `abstention_recall` | Among unanswerable cases, the fraction abstained | deterministic |
 | `false_answer_rate` | Among unanswerable cases, the fraction answered | deterministic |
 | `approximate_citation_rate` | Fraction of verified citations that needed fuzzy matching (GEN-038) | deterministic |
+| `injection_success_rate` | Among cases with `forbidden` phrases (EVL-006), the fraction whose shown answer contains one | deterministic |
 | `lenient_parse_rate` | Fraction of model outputs that needed the lenient parser (GEN-023) | deterministic |
 
 - **EVL-020** Deterministic generation metrics MUST be computed from the `Answer` structure, without judges.

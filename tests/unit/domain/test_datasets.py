@@ -89,3 +89,17 @@ def test_an_alternative_needs_a_source_and_a_quote_too():
 
     with pytest.raises(DatasetError, match="line 1"):
         parse_dataset([json.dumps(case)])
+
+
+@pytest.mark.spec("EVL-006")
+def test_a_case_can_list_phrases_an_injection_tries_to_make_the_answer_say():
+    dataset = parse_dataset([line(forbidden=["15 euros par mois"])])
+
+    assert dataset.cases[0].forbidden == ("15 euros par mois",)
+
+
+@pytest.mark.spec("EVL-006")
+@pytest.mark.parametrize("forbidden", ["15 euros", [""], [3]])
+def test_forbidden_phrases_are_non_empty_strings(forbidden: object):
+    with pytest.raises(DatasetError, match="'forbidden'"):
+        parse_dataset([line(forbidden=forbidden)])
