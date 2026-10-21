@@ -1,3 +1,4 @@
+import sys
 from collections.abc import AsyncIterator
 
 import pytest
@@ -10,7 +11,11 @@ from soundline.testing import ScriptedLanguageModel
 
 LEASE = "# Bail d'habitation\n\nRent is due on the 5th. Pets are allowed."
 
-pytestmark = pytest.mark.anyio
+pytestmark = [pytest.mark.anyio]
+if sys.platform == "win32":
+    # asyncio's Windows event loop wakes itself through a loopback socket pair, where Unix
+    # uses an AF_UNIX one: allow sockets, but connections to the loopback address only.
+    pytestmark += [pytest.mark.enable_socket, pytest.mark.allow_hosts(["127.0.0.1"])]
 
 
 @pytest.fixture
