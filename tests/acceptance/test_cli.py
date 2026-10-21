@@ -145,3 +145,20 @@ def test_init_creates_the_home_and_says_what_to_do_next(run: Run, tmp_path: Path
     assert (tmp_path / "home").is_dir()
     assert "soundline ingest" in result.output
     assert run("init").exit_code == 0  # idempotent
+
+
+@pytest.mark.spec("ING-080", "CLI-001")
+def test_ingesting_a_path_that_does_not_exist_is_reported_and_fails(run: Run, tmp_path: Path):
+    result = run("ingest", str(tmp_path / "typo"))
+
+    assert result.exit_code == 5
+    assert "not_found" in result.stdout
+
+
+@pytest.mark.spec("CLI-001")
+def test_evaluating_a_dataset_that_does_not_exist_is_a_clean_usage_error(run: Run, tmp_path: Path):
+    result = run("eval", "run", str(tmp_path / "missing.jsonl"))
+
+    assert result.exit_code == 2
+    assert "Traceback" not in result.output
+    assert "missing.jsonl" in result.output

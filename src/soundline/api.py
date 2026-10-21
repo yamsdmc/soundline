@@ -16,6 +16,7 @@ from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import Embedder, Index, LanguageModel, RunStore, SourceReader
 from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
+from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import ConfigurationError
 from soundline.domain.filters import Filter, Metadata, parse_filter
 from soundline.domain.hits import Hit, SearchResult
@@ -174,6 +175,8 @@ class Soundline:
     ) -> EvalRun:
         """Retrieval-only evaluation of a JSONL dataset; the run is stored (EVL-060, EVL-062)."""
         check_pipeline(self._index.manifest, self._manifest)
+        if not Path(dataset).is_file():
+            raise DatasetError(f"dataset file not found: {dataset}")
         run = run_retrieval_eval(
             name or datetime.now(UTC).strftime("run-%Y%m%d-%H%M%S"),
             DatasetFile(str(dataset), Path(dataset).read_text(encoding="utf-8")),

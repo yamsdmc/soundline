@@ -11,14 +11,17 @@ class LocalFiles:
 
     def discover(self, inputs: Sequence[str]) -> Discovery:
         sources: set[str] = set()
+        missing: list[str] = []
         for given in inputs:
             path = Path(given).resolve()
             if path.is_file():
                 sources.add(path.as_uri())
             elif path.is_dir():
                 sources.update(_walk(path))
+            else:
+                missing.append(path.as_uri())
         scopes = [Path(given).resolve().as_uri() for given in inputs]
-        return Discovery(sorted(sources), scopes)
+        return Discovery(sorted(sources), scopes, missing)
 
     def read(self, uri: str) -> bytes:
         return Path(url2pathname(unquote(urlparse(uri).path))).read_bytes()  # 3.12: no from_uri

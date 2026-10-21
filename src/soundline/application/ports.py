@@ -112,6 +112,8 @@ class Discovery:
     """URIs of every regular file found, supported or not, sorted."""
     scopes: list[str]
     """URIs of the inputs themselves: what a sync is allowed to delete under."""
+    missing: list[str] = field(default_factory=list[str])
+    """Inputs that do not exist, so that a typo is reported rather than ignored."""
 
 
 class SourceReader(Protocol):

@@ -24,7 +24,8 @@ def ingest_sources(
     """Ingests files and directories; with `delete_missing` (sync, ING-011), also deletes the
     documents under the inputs whose files disappeared, and nothing outside the inputs."""
     discovery = reader.discover(inputs)
-    results = [_ingest_one(uri, reader, ingestor) for uri in discovery.sources]
+    results = [SourceResult(uri, IngestionStatus.FAILED, "not_found") for uri in discovery.missing]
+    results += [_ingest_one(uri, reader, ingestor) for uri in discovery.sources]
     if delete_missing:
         present = set(discovery.sources)
         for source in documents.sources():
