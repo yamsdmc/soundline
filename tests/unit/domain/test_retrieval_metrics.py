@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 
 from soundline.domain.evaluation import Located, retrieval_metrics
 from soundline.domain.quotes import Span
+from soundline.domain.runs import aggregate
 
 
 def at(start: int, end: int, source: str = "lease.md") -> Located:
@@ -75,3 +76,9 @@ def test_metrics_are_bounded_and_recall_grows_with_k(quotes: list[Located], hits
     assert all(0.0 <= value <= 1.0 for value in metrics.values())
     recalls = [metrics[f"recall@{k}"] for k in (1, 3, 5, 10)]
     assert recalls == sorted(recalls)
+
+
+def test_aggregated_metrics_are_listed_in_natural_order():
+    per_case = {"c": retrieval_metrics([QUOTE_A], [QUOTE_A], ks=(10, 3))}
+
+    assert list(aggregate(per_case))[:4] == ["hit_rate@3", "hit_rate@10", "mrr", "ndcg@3"]

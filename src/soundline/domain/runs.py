@@ -49,7 +49,7 @@ class EvalRun:
 def aggregate(per_case: Mapping[str, Mapping[str, float]]) -> dict[str, Estimate]:
     from soundline.domain.statistics import bootstrap_mean  # noqa: PLC0415
 
-    names = sorted({name for metrics in per_case.values() for name in metrics})
+    names = sorted({name for metrics in per_case.values() for name in metrics}, key=_natural)
     return {name: bootstrap_mean({c: m[name] for c, m in per_case.items()}) for name in names}
 
 
@@ -129,12 +129,14 @@ def comparison_markdown(baseline: EvalRun, run: EvalRun, tolerance: float = 0.0)
     """A table ready for a pull request comment (EVL-065)."""
     lines = [
         f"Comparison of `{run.name}` against `{baseline.name}` "
-        f"({run.dataset.get('cases')} cases, 95% bootstrap intervals)",
+        f"({run.dataset.get('cases')} cases, 95% bootstrap intervals, tolerance {tolerance})",
         "",
         "| metric | baseline | run | difference [95% CI] | verdict |",
         "|---|---|---|---|---|",
     ]
-    for name, comparison in compare_runs(baseline, run, tolerance).items():
+    comparisons = compare_runs(baseline, run, tolerance)
+    for name in sorted(comparisons, key=_natural):
+        comparison = comparisons[name]
         flag = " ⚠️ too few cases" if comparison.too_few_cases else ""
         lines.append(
             f"| {name} | {baseline.metrics[name].mean:.3f} | {run.metrics[name].mean:.3f} "
@@ -146,3 +148,9 @@ def comparison_markdown(baseline: EvalRun, run: EvalRun, tolerance: float = 0.0)
 def _difference(comparison: Comparison) -> str:
     d = comparison.difference
     return f"{d.mean:+.3f} [{d.low:+.3f}, {d.high:+.3f}]"
+
+
+def _natural(metric: str) -> tuple[str, int]:
+    """recall@3 before recall@10."""
+    name, _, k = metric.partition("@")
+    return name, int(k) if k.isdigit() else 0

@@ -1,0 +1,14 @@
+# Regression gates for the smoke dataset (EVL-064). A rule fails only when the whole 95%
+# interval of the paired difference is beyond its tolerance (EVL-052).
+
+[[rule]]
+metric = "recall@5"
+max_regression = 0.05
+
+[[rule]]
+metric = "mrr"
+max_regression = 0.05
+
+[[rule]]
+metric = "ndcg@10"
+max_regression = 0.05

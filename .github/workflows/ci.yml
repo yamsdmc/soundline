@@ -56,6 +56,17 @@ jobs:
           type(open_database(':memory:')).__module__)"
       - run: uv run pytest -n auto
 
+  retrieval-eval:
+    name: Retrieval smoke evaluation (gate against the committed baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: scripts/smoke_eval.sh
+
   sqlite-probe:
     name: SQLite extension probe (${{ matrix.os }}) — ARC-014 spike
     runs-on: ${{ matrix.os }}

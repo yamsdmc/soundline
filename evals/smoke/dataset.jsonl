@@ -1,0 +1,22 @@
+{"id": "fr-rent-amount", "question": "Quel est le montant du loyer mensuel ?", "relevant": [{"source": "bail-paris.md", "quote": "Le loyer mensuel est de 1 250 euros, charges comprises."}], "tags": ["fr", "lookup"]}
+{"id": "fr-rent-due", "question": "Quand le loyer est-il payable ?", "relevant": [{"source": "bail-paris.md", "quote": "Il est payable le 5 de chaque mois par virement bancaire."}], "tags": ["fr", "lookup"]}
+{"id": "fr-late-penalty", "question": "Quelle pénalité en cas de retard de paiement ?", "relevant": [{"source": "bail-paris.md", "quote": "une pénalité de 5 % du loyer mensuel est appliquée"}], "tags": ["fr", "numbers"]}
+{"id": "fr-deposit", "question": "Combien vaut le dépôt de garantie ?", "relevant": [{"source": "bail-paris.md", "quote": "Le dépôt de garantie est fixé à deux mois de loyer hors charges."}], "tags": ["fr", "lookup"]}
+{"id": "fr-deposit-return", "question": "Dans quel délai le dépôt de garantie est-il restitué ?", "relevant": [{"source": "bail-paris.md", "quote": "Il est restitué dans un délai d'un mois après la remise des clés."}], "tags": ["fr", "lookup"]}
+{"id": "fr-dogs", "question": "Les chiens sont-ils autorisés ?", "relevant": [{"source": "bail-paris.md", "quote": "Les chiens de plus de 10 kilos sont interdits."}], "tags": ["fr", "lookup"]}
+{"id": "fr-landlord", "question": "Qui est le bailleur ?", "relevant": [{"source": "bail-paris.md", "quote": "Le bailleur est la société Habitat Seine."}], "tags": ["fr", "names"]}
+{"id": "en-rent", "question": "How much is the rent in London?", "relevant": [{"source": "lease-london.md", "quote": "The rent is 1,900 pounds per calendar month"}], "tags": ["en", "numbers"]}
+{"id": "en-deposit", "question": "Where is the tenancy deposit protected?", "relevant": [{"source": "lease-london.md", "quote": "protected in a government-approved tenancy deposit scheme"}], "tags": ["en", "lookup"]}
+{"id": "en-leak", "question": "How fast must a leak be reported?", "relevant": [{"source": "lease-london.md", "quote": "The tenant must report any leak or damp within 48 hours."}], "tags": ["en", "numbers"]}
+{"id": "en-boiler", "question": "When does the landlord repair the boiler?", "relevant": [{"source": "lease-london.md", "quote": "The landlord repairs the boiler within three working days."}], "tags": ["en", "lookup"]}
+{"id": "en-notice", "question": "How much notice to end the tenancy?", "relevant": [{"source": "lease-london.md", "quote": "Either party may end the tenancy with two months' written notice"}], "tags": ["en", "lookup"]}
+{"id": "en-quiet-hours", "question": "When are the quiet hours?", "relevant": [{"source": "house-rules.md", "quote": "Quiet hours run from 10 pm to 7 am on weekdays"}], "tags": ["en", "lookup"]}
+{"id": "en-blue-bin", "question": "Which day is the blue bin collected?", "relevant": [{"source": "house-rules.md", "quote": "which is collected every Tuesday"}], "tags": ["en", "lookup"]}
+{"id": "en-bicycles", "question": "Where must bicycles be stored?", "relevant": [{"source": "house-rules.md", "quote": "Bicycles must be stored in the basement bike room"}], "tags": ["en", "lookup"]}
+{"id": "id-invoice-0042", "question": "INV-2024-0042", "relevant": [{"source": "invoices.md", "quote": "| INV-2024-0042 | March | 1 250 € | paid late |"}], "tags": ["identifier", "table"]}
+{"id": "id-invoice-0043-penalty", "question": "Why is invoice INV-2024-0043 higher?", "relevant": [{"source": "invoices.md", "quote": "Invoice INV-2024-0043 includes the 5% late payment penalty from March."}], "tags": ["identifier"]}
+{"id": "code-late-fee", "question": "late_fee function penalty computation", "relevant": [{"source": "rent-calculator.md", "quote": "return round(rent * 0.05, 2)"}], "tags": ["code"]}
+{"id": "code-rounding", "question": "How are penalties rounded?", "relevant": [{"source": "rent-calculator.md", "quote": "Penalties are rounded to the nearest cent."}], "tags": ["en", "lookup"]}
+{"id": "html-ag-date", "question": "Quand se tient l'assemblée générale ?", "relevant": [{"source": "syndic.html", "quote": "se tient le 12 juin à 18 h dans le hall"}], "tags": ["fr", "html"]}
+{"id": "html-works", "question": "Quels travaux ont été votés ?", "relevant": [{"source": "syndic.html", "quote": "Ravalement de la façade côté rue."}, {"source": "syndic.html", "quote": "Remplacement de l'interphone."}], "tags": ["fr", "html", "multi"]}
+{"id": "unanswerable-parking", "question": "Combien coûte une place de parking ?", "answerable": false, "relevant": [], "tags": ["unanswerable"]}

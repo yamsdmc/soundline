@@ -174,11 +174,14 @@ def eval_compare(
     baseline: str,
     run: str,
     output: Annotated[str, typer.Option("--format", help="text, md or json.")] = "text",
+    tolerance: Annotated[
+        float, typer.Option(help="Smallest difference worth a verdict (EVL-052).")
+    ] = 0.02,
 ) -> None:
     with _soundline() as soundline:
         before, after = soundline.load_run(baseline), soundline.load_run(run)
         if output == "json":
-            comparisons = compare_runs(before, after)
+            comparisons = compare_runs(before, after, tolerance)
             typer.echo(
                 json.dumps(
                     {
@@ -188,7 +191,7 @@ def eval_compare(
                 )
             )
         else:
-            typer.echo(comparison_markdown(before, after))
+            typer.echo(comparison_markdown(before, after, tolerance))
 
 
 @eval_app.command("gate", help="Exit 1 when a rule fails against the baseline (EVL-064).")
