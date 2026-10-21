@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- The trust benchmark (EVL-092): `make bench-trust` compares a naive LangChain RAG, Soundline without verification (`eval run --without-verification`, GEN-080) and Soundline, on the `trust-fr` dataset (47 questions, 18 unanswerable, 7 with a planted page; `forbidden` phrases and `injection_success_rate`, EVL-006). Results are in the README, including where verification does not help.
 - MCP server (M5): `soundline mcp` serves the index over stdio, read-only, with `search`, `ask` and `list_corpora` (install `soundline[mcp]`). Descriptions tell agents when to search and when to ask; passages come back labeled with source and section as untrusted data; Soundline errors reach the agent with their stable code.
 - Judge calibration (M5, EVL-043): `eval labels <run>` exports a judged run's claims as labels to review, the judge's verdict as an unreviewed suggestion; `eval calibrate <labels> --judge <model>` reports accuracy, Cohen's kappa, false accepts and rejects, and each disagreement with the judge's rationale. The result is stored per judge model and version, and later runs show it next to faithfulness instead of "uncalibrated".
 - Relevant quotes may list equivalent alternatives under `"or"` (EVL-001). Cached model calls count at their original duration in latencies.

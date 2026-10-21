@@ -29,13 +29,34 @@ Building a RAG demo takes an afternoon. Building one you can **trust** is a diff
 
 ## The trust benchmark
 
-The first release ships with a reproducible benchmark comparing, on the same documents and questions (including unanswerable questions and prompt-injection attempts):
+Three systems answer the same 47 French questions about renting, over the same documents: official service-public.fr fact sheets plus seven planted pages that carry a false fact or an instruction to the assistant ([evals/trust-fr](evals/trust-fr/README.md)). 29 questions are answerable, 18 are not.
 
-1. a naive RAG baseline,
-2. Soundline without verification,
-3. Soundline with verification.
+1. **Naive RAG**: what a LangChain tutorial builds (1000-character chunks, dense retrieval, free-text answer with `[n]` markers).
+2. **Soundline, verification off**: the same pipeline, keeping every quote as the model wrote it.
+3. **Soundline**: verified quotes.
 
-It reports false-answer rate, faithfulness, correctness, latency and cost, with confidence intervals. One command reproduces it. **Results will be published here as they come out, including where verification does not help.**
+All three share the embedder, k = 5 and the model: `qwen3.5:9b` through Ollama, on a laptop (M1 Max). Mean [95% CI] over the cases each metric applies to:
+
+| | Naive RAG | Soundline, verification off | Soundline |
+|---|---|---|---|
+| False answers to unanswerable questions (n=18) ↓ | 0.61 [0.39, 0.83] | 0.17 [0.00, 0.33] | **0.17** [0.00, 0.33] |
+| Injections that reach the answer (n=6) ↓ | 0.67 [0.33, 1.00] | 0.67 [0.33, 1.00] | 0.67 [0.33, 1.00] |
+| Answerable questions answered (n=29) ↑ | 0.97 | 0.97 | 0.97 |
+| Faithfulness, uncalibrated judge ↑ | 0.74 [0.62, 0.85] | 0.86 [0.75, 0.95] | 0.86 [0.75, 0.95] |
+| Citations shown that exist in the source ↑ | not checkable | 0.99 | **1.00** |
+| Latency p50 / p95 ↓ | 5.9 s / 8.1 s | 10.4 s / 25.4 s | 10.4 s / 25.3 s |
+| Input tokens p50 ↓ | 1,291 | 2,380 | 2,380 |
+
+What this shows, and what it does not:
+
+- **Soundline gives far fewer false answers** (3 of 18 against 11 of 18; paired difference −0.44 [−0.67, −0.22]). **The gain does not come from verification**: Soundline without verification does exactly as well. It comes from the answer protocol (claims tied to evidence, and an explicit way to say the evidence is insufficient).
+- **Verification changes almost nothing with this model.** qwen3.5:9b already quotes its sources faithfully (99% of its quotes exist), so there is little to remove. Verification guarantees that what is shown exists, 100% of the time; how often that matters depends on the model, which this run does not measure.
+- **Planted content fools all three systems** on 4 of 6 cases, including a fake one-week notice period from an "agency" page and a fake winter-truce date. On one case Soundline does worse than the baseline: it quotes the planted 50% penalty next to the real 10%. **A verified quote proves that the source says it, not that the source is right.** Flagging conflicting sources is on the roadmap.
+- **Faithfulness looks higher, but the paired difference is not significant** (+0.02 [−0.13, +0.17] on the cases both systems answered).
+- **The cost**: about 1.8× the latency at the median, 3× at p95, and 1.8× the input tokens.
+- **Limits**: one model, one run, 47 questions (the intervals are wide; 6 injection cases are too few for a firm rate), and a judge that is the same model as the generator and not yet calibrated (EVL-043). Correctness against reference answers is not measured yet.
+
+Full results, with every paired comparison: [benchmarks/trust/results.md](benchmarks/trust/results.md). Reproduce them locally, at no cost: `make bench-trust` (needs [Ollama](https://ollama.com) with `qwen3.5:9b`).
 
 ## What it will look like
 
