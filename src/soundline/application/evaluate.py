@@ -170,7 +170,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
             metrics.update(_operational(answer, latency_ms))
             answers[case.id] = answer_to_dict(answer)
             if generator.judge is not None:
-                judged, failed = _judged(generator.judge, answer, metrics)
+                judged, failed = judge_claims(generator.judge, answer, metrics)
                 answers[case.id]["judgments"] = judged
                 unreadable += failed
         if metrics:
@@ -210,7 +210,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
     )
 
 
-def _judged(
+def judge_claims(
     judge: FaithfulnessJudge, answer: Answer, metrics: dict[str, float]
 ) -> tuple[list[dict[str, object]], int]:
     """Faithfulness of the case: entailed claims among those with a readable verdict
