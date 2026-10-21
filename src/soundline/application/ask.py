@@ -1,5 +1,6 @@
 """Grounded answers (docs/spec/05-generation.md): the model proposes, the code verifies."""
 
+import time
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import cast
@@ -181,11 +182,23 @@ class _Calls:
         self.stages: list[StageUsage] = []
 
     def generate(self, stage: str, request: GenerationRequest) -> str:
+        started = time.perf_counter()
         generation = self._llm.generate(request)
+        elapsed_ms = (time.perf_counter() - started) * 1000
         model = self._llm.model_id
         price = price_for(model, self._prices)
         cost = price.cost(generation.usage) if price else None
-        self.stages.append(StageUsage(stage, model, generation.usage, cost))
+        latency_ms = generation.latency_ms if generation.cached else elapsed_ms
+        self.stages.append(
+            StageUsage(
+                stage,
+                model,
+                generation.usage,
+                cost,
+                latency_ms=latency_ms or 0.0,
+                cached=generation.cached,
+            )
+        )
         return generation.text
 
     def usage(self) -> Usage:

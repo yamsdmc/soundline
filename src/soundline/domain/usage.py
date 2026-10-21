@@ -65,6 +65,9 @@ class StageUsage:
     tokens: TokenUsage
     cost_usd: float | None
     """None when the model has no known price."""
+    latency_ms: float = 0.0
+    """The model call, as originally measured even when answered from a cache."""
+    cached: bool = False
 
 
 @dataclass(frozen=True)

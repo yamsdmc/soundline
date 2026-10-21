@@ -125,6 +125,8 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
                     "model": stage.model,
                     "tokens": asdict(stage.tokens),
                     "cost_usd": stage.cost_usd,
+                    "latency_ms": stage.latency_ms,
+                    "cached": stage.cached,
                 }
                 for stage in answer.usage.stages
             ],

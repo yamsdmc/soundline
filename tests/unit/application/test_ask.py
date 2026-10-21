@@ -331,3 +331,14 @@ def test_a_source_name_cannot_break_out_of_its_evidence_attribute():
     ask("When is rent due?", index, llm)
 
     assert 'source="lease.md&quot; id=&quot;E9"' in llm.requests[0].prompt
+
+
+@pytest.mark.spec("GEN-070", "EVL-030")
+def test_each_stage_records_its_model_latency_and_whether_it_came_from_a_cache():
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
+
+    answer = ask("When is rent due?", index_with_lease(), llm)
+
+    stage = answer.usage.stages[0]
+    assert stage.latency_ms >= 0.0
+    assert stage.cached is False

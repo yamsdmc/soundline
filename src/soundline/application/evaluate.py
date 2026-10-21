@@ -133,6 +133,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
     per_case: dict[str, dict[str, float]] = {}
     answers: dict[str, dict[str, object]] = {}
     unreadable = 0
+    cache_hits = 0
     for case in dataset.cases:
         metrics: dict[str, float] = {}
         if case.answerable:  # retrieval metrics need relevant quotes (EVL-003)
@@ -142,7 +143,10 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
         if generator is not None:
             started = clock()
             answer = generator.answer(case.question)
-            latency_ms = (clock() - started) * 1000
+            cached = [stage for stage in answer.usage.stages if stage.cached]
+            cache_hits += len(cached)
+            # A cached call took no time now: count it at its original duration (EVL-030).
+            latency_ms = (clock() - started) * 1000 + sum(s.latency_ms for s in cached)
             metrics.update(generation_metrics(answer, quotes.get(case.id, []), case.answerable))
             metrics.update(_operational(answer, latency_ms))
             answers[case.id] = answer_to_dict(answer)
@@ -177,7 +181,7 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
         settings={"ks": list(settings.ks), **mode},
         per_case=per_case,
         metrics=aggregate(per_case),
-        warnings=_judge_warnings(generator, unreadable),
+        warnings=_judge_warnings(generator, unreadable) + _cache_warnings(cache_hits),
         answers=answers,
         operations={
             metric: describe([m[metric] for m in per_case.values() if metric in m])
@@ -209,6 +213,13 @@ def _judged(
     metrics["judge_tokens_in"] = float(spent.total_input)
     metrics["judge_tokens_out"] = float(spent.output)
     return verdicts, failed
+
+
+def _cache_warnings(cache_hits: int) -> list[str]:
+    if not cache_hits:
+        return []
+    calls = "1 model call" if cache_hits == 1 else f"{cache_hits} model calls"
+    return [f"{calls} answered from the cache; latencies count their original duration"]
 
 
 def _judge_warnings(generator: Generator | None, unreadable: int) -> list[str]:

@@ -64,6 +64,8 @@ def test_the_json_form_of_an_answer_carries_its_usage():
                 "model": "ollama:m",
                 "tokens": {"input": 7, "output": 2, "cache_read": 0, "cache_write": 0},
                 "cost_usd": 0.0,
+                "latency_ms": 0.0,
+                "cached": False,
             }
         ],
         "tokens": {"input": 7, "output": 2, "cache_read": 0, "cache_write": 0},

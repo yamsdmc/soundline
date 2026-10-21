@@ -9,7 +9,9 @@ from soundline.domain.usage import TokenUsage
 
 @pytest.mark.spec("EVL-061")
 def test_cached_generations_survive_the_process(tmp_path: Path):
-    generation = Generation('{"claims": []}', TokenUsage(input=5, output=1, cache_read=3))
+    generation = Generation(
+        '{"claims": []}', TokenUsage(input=5, output=1, cache_read=3), latency_ms=812.5
+    )
     JsonGenerationCache(tmp_path).put("a" * 64, generation)
 
     reopened = JsonGenerationCache(tmp_path)

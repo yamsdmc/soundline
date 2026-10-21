@@ -55,6 +55,9 @@ class Generation:
     text: str
     """The model's raw output; parsing it is the application's job."""
     usage: TokenUsage = field(default_factory=TokenUsage)
+    latency_ms: float | None = None
+    """Duration of the original model call, when known (kept by the cache, EVL-030)."""
+    cached: bool = False
 
 
 class LanguageModel(Protocol):

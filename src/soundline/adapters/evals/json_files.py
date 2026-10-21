@@ -41,12 +41,16 @@ class JsonGenerationCache:
         if not path.is_file():
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
-        return Generation(data["text"], TokenUsage(**data["usage"]))
+        return Generation(data["text"], TokenUsage(**data["usage"]), data.get("latency_ms"))
 
     def put(self, key: str, generation: Generation) -> None:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
-        data = {"text": generation.text, "usage": asdict(generation.usage)}
+        data = {
+            "text": generation.text,
+            "usage": asdict(generation.usage),
+            "latency_ms": generation.latency_ms,
+        }
         path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
     def _path(self, key: str) -> Path:

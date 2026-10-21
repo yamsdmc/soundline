@@ -2,6 +2,9 @@
 
 import hashlib
 import json
+import time
+from collections.abc import Callable
+from dataclasses import replace
 
 from soundline.application.ports import (
     Generation,
@@ -15,9 +18,15 @@ class CachedLanguageModel:
     """Answers an identical request from the cache: same output, same recorded usage, no
     model cost. The key covers the model and everything it is sent."""
 
-    def __init__(self, inner: LanguageModel, cache: GenerationCache) -> None:
+    def __init__(
+        self,
+        inner: LanguageModel,
+        cache: GenerationCache,
+        clock: Callable[[], float] = time.perf_counter,
+    ) -> None:
         self._inner = inner
         self._cache = cache
+        self._clock = clock
 
     @property
     def model_id(self) -> str:
@@ -27,8 +36,11 @@ class CachedLanguageModel:
         key = _key(self._inner.model_id, request)
         cached = self._cache.get(key)
         if cached is not None:
-            return cached
+            return replace(cached, cached=True)
+        started = self._clock()
         generation = self._inner.generate(request)
+        latency_ms = (self._clock() - started) * 1000
+        generation = replace(generation, latency_ms=latency_ms, cached=False)
         self._cache.put(key, generation)
         return generation
 
