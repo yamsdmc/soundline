@@ -10,8 +10,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.shared import ReasoningEffort
 
-from soundline.application.answer_format import ANSWER_SCHEMA
-from soundline.application.ports import Generation, GenerationRequest
+from soundline.application.ports import Generation, GenerationRequest, OutputFormat
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
 from soundline.domain.usage import TokenUsage
 
@@ -76,7 +75,7 @@ class OpenAICompatibleLanguageModel:
                 model=self._model,
                 max_tokens=self._max_tokens,
                 messages=messages,
-                response_format=self._response_format(),
+                response_format=self._response_format(request.output),
                 temperature=openai.omit if self._temperature is None else self._temperature,
                 reasoning_effort=(
                     openai.omit if self._reasoning_effort is None else self._reasoning_effort
@@ -112,14 +111,14 @@ class OpenAICompatibleLanguageModel:
         # and the use case retries once (GEN-071, GEN-020).
         return Generation(content, _token_usage(response.usage))
 
-    def _response_format(self) -> ResponseFormat | openai.Omit:
+    def _response_format(self, output: OutputFormat) -> ResponseFormat | openai.Omit:
         if self._json_mode == "prompt":
             return openai.omit
         if self._json_mode == "object":
             return {"type": "json_object"}
         return {
             "type": "json_schema",
-            "json_schema": {"name": "grounded_answer", "schema": ANSWER_SCHEMA, "strict": True},
+            "json_schema": {"name": output.name, "schema": dict(output.schema), "strict": True},
         }
 
 

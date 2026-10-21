@@ -127,6 +127,7 @@ def _generate(calls: _Calls, request: GenerationRequest) -> _ModelOutput:
             request.system,
             f"{request.prompt}\n\nYour previous output was invalid: {first}. "
             "Respond again with JSON only, in one of the two forms above.",
+            request.output,
         )
         try:
             return _parse(calls.generate("generation_retry", retry))

@@ -13,6 +13,7 @@ from pathlib import Path
 from string import Template
 from typing import Self
 
+from soundline.application.answer_format import ANSWER_FORMAT
 from soundline.application.ports import GenerationRequest
 from soundline.domain.chunks import Chunk
 from soundline.domain.errors import ConfigurationError
@@ -57,7 +58,7 @@ class PromptTemplate:
         user = self.user.substitute(
             evidence=blocks, question=question, language_instruction=_language(question)
         )
-        return GenerationRequest(self.system, user)
+        return GenerationRequest(self.system, user, ANSWER_FORMAT)
 
 
 def _language(question: str) -> str:

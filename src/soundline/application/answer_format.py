@@ -1,5 +1,7 @@
 """The structured answer every language model adapter asks for (GEN-012)."""
 
+from soundline.application.ports import OutputFormat
+
 # The answer contract of docs/spec/05-generation.md as a strict JSON schema: both fields are
 # always present, `insufficient_evidence` is null when the model answers.
 ANSWER_SCHEMA: dict[str, object] = {
@@ -33,3 +35,5 @@ ANSWER_SCHEMA: dict[str, object] = {
     "required": ["claims", "insufficient_evidence"],
     "additionalProperties": False,
 }
+
+ANSWER_FORMAT = OutputFormat("grounded_answer", ANSWER_SCHEMA)

@@ -2,7 +2,6 @@
 
 import anthropic
 
-from soundline.application.answer_format import ANSWER_SCHEMA
 from soundline.application.ports import Generation, GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
 from soundline.domain.usage import TokenUsage
@@ -33,7 +32,9 @@ class AnthropicLanguageModel:
                 max_tokens=self._max_tokens,
                 system=request.system,
                 messages=[{"role": "user", "content": request.prompt}],
-                output_config={"format": {"type": "json_schema", "schema": ANSWER_SCHEMA}},
+                output_config={
+                    "format": {"type": "json_schema", "schema": dict(request.output.schema)}
+                },
             )
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
             raise ConfigurationError(

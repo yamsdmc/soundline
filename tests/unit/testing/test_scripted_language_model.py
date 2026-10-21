@@ -2,12 +2,13 @@ import json
 
 import pytest
 
+from soundline.application.answer_format import ANSWER_FORMAT
 from soundline.application.ports import GenerationRequest
 from soundline.testing import ScriptedLanguageModel
 
 
 def request(prompt: str) -> GenerationRequest:
-    return GenerationRequest(system="Answer from evidence.", prompt=prompt)
+    return GenerationRequest(system="Answer from evidence.", prompt=prompt, output=ANSWER_FORMAT)
 
 
 def test_scripted_responses_are_returned_in_order_and_requests_recorded():

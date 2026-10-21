@@ -6,11 +6,14 @@ import httpx2
 import pytest
 
 from soundline.adapters.llms.anthropic import AnthropicLanguageModel
+from soundline.application.answer_format import ANSWER_FORMAT
 from soundline.application.ports import GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
 from soundline.domain.usage import TokenUsage
 
-REQUEST = GenerationRequest(system="Answer from evidence.", prompt="<evidence>...</evidence>")
+REQUEST = GenerationRequest(
+    system="Answer from evidence.", prompt="<evidence>...</evidence>", output=ANSWER_FORMAT
+)
 ANSWER = '{"claims": [], "insufficient_evidence": "nothing relevant"}'
 
 

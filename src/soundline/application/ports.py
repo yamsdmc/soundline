@@ -1,6 +1,6 @@
 """Ports: what the application needs from the outside world (see docs/spec/02-architecture.md)."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -36,9 +36,18 @@ class DocumentStore(Protocol):
 
 
 @dataclass(frozen=True)
+class OutputFormat:
+    """A strict JSON schema the model's output must follow (GEN-012)."""
+
+    name: str
+    schema: Mapping[str, object]
+
+
+@dataclass(frozen=True)
 class GenerationRequest:
     system: str
     prompt: str
+    output: OutputFormat
 
 
 @dataclass(frozen=True)
