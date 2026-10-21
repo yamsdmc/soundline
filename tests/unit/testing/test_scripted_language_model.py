@@ -16,8 +16,8 @@ def test_scripted_responses_are_returned_in_order_and_requests_recorded():
     first = model.generate(request("first"))
     second = model.generate(request("second"))
 
-    assert json.loads(first) == {"claims": []}  # mappings come back as JSON text
-    assert second == "```json\n{}\n``` chatty"  # strings come back verbatim
+    assert json.loads(first.text) == {"claims": []}  # mappings come back as JSON text
+    assert second.text == "```json\n{}\n``` chatty"  # strings come back verbatim
     assert [r.prompt for r in model.requests] == ["first", "second"]
 
 

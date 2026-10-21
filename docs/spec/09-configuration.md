@@ -93,8 +93,10 @@ trace_retention = 0                 # number of recent traces kept for inspectio
 host = "127.0.0.1"
 port = 8484
 
-[pricing]                           # USD per million tokens, overridable
-# "anthropic:claude-sonnet-5-5" = { input = 0.0, output = 0.0 }
+[pricing]                           # USD per million tokens (GEN-070)
+# "anthropic:claude-sonnet-5-5" = { input = 0.0, output = 0.0, cache_read = 0.0, cache_write = 0.0 }
+# No paid price ships built in: prices change. ollama:* models are free; a model without a
+# price reports an unknown cost rather than a wrong one.
 ```
 
 The values above are illustrative defaults. The generated `soundline.toml` from `soundline init` is the reference. Model defaults MUST be reviewed at each release.

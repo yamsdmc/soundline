@@ -4,12 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from soundline.application.ask import ask
+from soundline.application.ask import GenerationSettings, ask
 from soundline.application.prompts import PromptTemplate
 from soundline.domain.answers import AbstentionReason, AnswerStatus
 from soundline.domain.chunks import Chunk
 from soundline.domain.errors import GenerationError
 from soundline.domain.quotes import Span
+from soundline.domain.usage import Price, TokenUsage
 from soundline.testing import InMemoryIndex, ScriptedLanguageModel
 
 LEASE = "Rent is due on the 5th. Pets are allowed."
@@ -255,8 +256,46 @@ def test_a_custom_prompt_is_used_and_recorded(tmp_path: Path):
         "When is rent due?",
         index_with_lease(),
         llm,
-        prompt=PromptTemplate.from_directory(directory),
+        GenerationSettings(prompt=PromptTemplate.from_directory(directory)),
     )
 
     assert llm.requests[0].system == "Terse."
     assert answer.prompt_version == "terse-v2"
+
+
+@pytest.mark.spec("GEN-070")
+def test_the_answer_reports_tokens_and_cost_per_stage_from_the_price_table():
+    llm = ScriptedLanguageModel(
+        "not json at all",
+        citing("E1", "Rent is due on the 5th"),
+        usage=TokenUsage(input=1_000_000, output=100_000),
+        model_id="anthropic:m",
+    )
+
+    settings = GenerationSettings(prices={"anthropic:m": Price(3.0, 15.0)})
+
+    answer = ask("When is rent due?", index_with_lease(), llm, settings)
+
+    assert [(s.stage, s.model, s.cost_usd) for s in answer.usage.stages] == [
+        ("generation", "anthropic:m", pytest.approx(4.5)),
+        ("generation_retry", "anthropic:m", pytest.approx(4.5)),
+    ]
+    assert answer.usage.tokens == TokenUsage(input=2_000_000, output=200_000)
+    assert answer.usage.cost_usd == pytest.approx(9.0)
+
+
+@pytest.mark.spec("GEN-070")
+def test_a_model_without_a_price_has_an_unknown_cost():
+    llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"), usage=TokenUsage(input=5))
+
+    answer = ask("When is rent due?", index_with_lease(), llm)
+
+    assert answer.usage.tokens == TokenUsage(input=5)
+    assert answer.usage.cost_usd is None
+
+
+@pytest.mark.spec("GEN-001", "GEN-070")
+def test_no_model_call_costs_nothing():
+    answer = ask("When is rent due?", InMemoryIndex(), ScriptedLanguageModel())
+
+    assert answer.usage.cost_usd == 0.0

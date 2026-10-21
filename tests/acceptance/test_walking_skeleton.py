@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from soundline import AbstentionReason, AnswerStatus, PromptTemplate, Soundline
+from soundline import (
+    AbstentionReason,
+    AnswerStatus,
+    GenerationSettings,
+    PromptTemplate,
+    Soundline,
+)
 from soundline.testing import ScriptedLanguageModel
 
 
@@ -44,7 +50,8 @@ def test_a_custom_prompt_template_is_used_and_its_version_recorded(tmp_path: Pat
     (prompt / "system.txt").write_text("House rules.")
     (prompt / "user.txt").write_text("$evidence\n$question\n$language_instruction")
     llm = ScriptedLanguageModel({"claims": [], "insufficient_evidence": "unclear"})
-    soundline = Soundline.in_memory(llm=llm, prompt=PromptTemplate.from_directory(prompt))
+    generation = GenerationSettings(prompt=PromptTemplate.from_directory(prompt))
+    soundline = Soundline.in_memory(llm=llm, generation=generation)
     soundline.ingest_text("lease.md", "Rent is due on the 5th.")
 
     answer = soundline.ask("When is rent due?")

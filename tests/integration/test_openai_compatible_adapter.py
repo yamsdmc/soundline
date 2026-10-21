@@ -8,12 +8,15 @@ import pytest
 from soundline.adapters.llms.openai_compatible import OpenAICompatibleLanguageModel
 from soundline.application.ports import GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
+from soundline.domain.usage import TokenUsage
 
 REQUEST = GenerationRequest(system="Answer from evidence.", prompt="<evidence>...</evidence>")
 ANSWER = '{"claims": [], "insufficient_evidence": "nothing relevant"}'
 
 
-def completion(content: str | None, finish_reason: str = "stop") -> dict[str, object]:
+def completion(
+    content: str | None, finish_reason: str = "stop", usage: dict[str, object] | None = None
+) -> dict[str, object]:
     return {
         "id": "chatcmpl-1",
         "object": "chat.completion",
@@ -26,7 +29,7 @@ def completion(content: str | None, finish_reason: str = "stop") -> dict[str, ob
                 "finish_reason": finish_reason,
             }
         ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        "usage": usage or {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
     }
 
 
@@ -61,7 +64,7 @@ def model_replying(
 def test_the_request_asks_for_the_answer_schema_as_strict_json():
     seen: list[Any] = []
 
-    text = model_answering(200, completion(ANSWER), seen).generate(REQUEST)
+    text = model_answering(200, completion(ANSWER), seen).generate(REQUEST).text
 
     body = seen[0]
     assert text == ANSWER
@@ -128,7 +131,7 @@ def test_an_empty_or_refused_message_is_a_generation_error():
 @pytest.mark.spec("GEN-071")
 def test_a_truncated_output_is_returned_as_is_so_the_parser_rejects_it():
     assert (
-        model_answering(200, completion('{"claims": [', "length")).generate(REQUEST)
+        model_answering(200, completion('{"claims": [', "length")).generate(REQUEST).text
         == '{"claims": ['
     )
 
@@ -146,7 +149,7 @@ def test_a_server_without_structured_output_falls_back_to_json_asked_in_the_prom
     seen: list[Any] = []
     model = model_replying([UNSUPPORTED, (200, completion(ANSWER))], seen)
 
-    first, second = model.generate(REQUEST), model.generate(REQUEST)
+    first, second = model.generate(REQUEST).text, model.generate(REQUEST).text
 
     assert first == second == ANSWER
     assert "response_format" in seen[0]
@@ -168,3 +171,29 @@ def test_a_reasoning_effort_is_sent_only_when_configured():
 
     assert "reasoning_effort" not in seen[0]
     assert seen[1]["reasoning_effort"] == "none"
+
+
+@pytest.mark.spec("GEN-070")
+def test_the_generation_reports_token_usage_with_cached_prompt_tokens_apart():
+    usage: dict[str, object] = {
+        "prompt_tokens": 1000,
+        "completion_tokens": 50,
+        "total_tokens": 1050,
+        "prompt_tokens_details": {"cached_tokens": 800},
+    }
+
+    generation = model_answering(200, completion(ANSWER, usage=usage)).generate(REQUEST)
+
+    assert generation.usage == TokenUsage(input=200, output=50, cache_read=800)
+
+
+def test_a_server_that_reports_no_usage_counts_zero_tokens():
+    body = completion(ANSWER)
+    del body["usage"]
+
+    assert model_answering(200, body).generate(REQUEST).usage == TokenUsage()
+
+
+def test_the_model_id_names_the_provider():
+    assert model_answering(200, completion(ANSWER)).model_id == "openai:llama3.2"
+    assert model_answering(200, completion(ANSWER), provider="ollama").model_id == "ollama:llama3.2"

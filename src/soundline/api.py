@@ -7,7 +7,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
-from soundline.application.ask import ask
+from soundline.application.ask import GenerationSettings, ask
 from soundline.application.diagnostics import Check, diagnose
 from soundline.application.evaluate import DatasetFile, EvalSettings, run_retrieval_eval
 from soundline.application.hybrid_retriever import HybridRetriever
@@ -15,7 +15,6 @@ from soundline.application.ingest import IngestionReport, IngestionStatus, Inges
 from soundline.application.ingest_sources import ingest_sources
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import Embedder, Index, LanguageModel, RunStore, SourceReader
-from soundline.application.prompts import DEFAULT_PROMPT, PromptTemplate
 from soundline.domain.answers import Answer
 from soundline.domain.chunking import ChunkingSettings
 from soundline.domain.datasets import DatasetError
@@ -44,7 +43,7 @@ class Soundline:
         *,
         reader: SourceReader | None = None,
         runs: RunStore | None = None,
-        prompt: PromptTemplate | None = None,
+        generation: GenerationSettings | None = None,
     ) -> None:
         chunking = chunking or ChunkingSettings()
         self._index = index
@@ -56,7 +55,7 @@ class Soundline:
         self._llm = llm
         self._reader = reader or _local_files()
         self._runs = runs or InMemoryRunStore()
-        self._prompt = prompt or DEFAULT_PROMPT  # GEN-014
+        self._generation = generation or GenerationSettings()
 
     @classmethod
     def open(
@@ -66,7 +65,7 @@ class Soundline:
         embedder: Embedder | None = None,
         chunking: ChunkingSettings | None = None,
         *,
-        prompt: PromptTemplate | None = None,
+        generation: GenerationSettings | None = None,
     ) -> Self:
         """A persistent index in `home` (one SQLite file, STO-040)."""
         from soundline.adapters.stores.sqlite import (  # noqa: PLC0415  # composition only
@@ -93,7 +92,7 @@ class Soundline:
         from soundline.adapters.evals.json_files import JsonRunStore  # noqa: PLC0415
 
         runs = JsonRunStore(Path(home) / "evals" / "runs")
-        return cls(index, embedder, llm, chunking, runs=runs, prompt=prompt)
+        return cls(index, embedder, llm, chunking, runs=runs, generation=generation)
 
     def __enter__(self) -> Self:
         return self
@@ -116,13 +115,15 @@ class Soundline:
         embedder: Embedder | None = None,
         max_tokens: int = 384,
         *,
-        prompt: PromptTemplate | None = None,
+        generation: GenerationSettings | None = None,
     ) -> Self:
         """A non-persistent, offline instance, for tests and notebooks."""
         embedder = embedder or HashingEmbedder()
         dense = InMemoryVectorIndex(embedder.dimension)
         index = Index(InMemoryDocumentStore(), InMemoryIndex(), dense, InMemoryManifestStore())
-        return cls(index, embedder, llm, ChunkingSettings(max_tokens=max_tokens), prompt=prompt)
+        return cls(
+            index, embedder, llm, ChunkingSettings(max_tokens=max_tokens), generation=generation
+        )
 
     def ingest_text(
         self, source: str, text: str, metadata: Metadata | None = None
@@ -176,7 +177,7 @@ class Soundline:
                 "asking needs a language model: set SOUNDLINE_LLM (e.g."
                 " anthropic:claude-sonnet-5-5), or use search, which needs none"
             )
-        return ask(question, self._retriever, self._llm, prompt=self._prompt)
+        return ask(question, self._retriever, self._llm, self._generation)
 
     def evaluate(
         self,
@@ -259,7 +260,7 @@ def llm_from_spec(spec: str) -> LanguageModel:
 
         client = openai.OpenAI(base_url=f"{host}/v1", api_key="ollama")
         return OpenAICompatibleLanguageModel(
-            model, client, temperature=0.0, reasoning_effort="none"
+            model, client, temperature=0.0, reasoning_effort="none", provider="ollama"
         )
     raise ConfigurationError(
         f"unknown language model {spec!r}; use anthropic:<model>, openai:<model> or ollama:<model>"

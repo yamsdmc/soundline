@@ -12,6 +12,7 @@ import typer
 
 from soundline import Soundline
 from soundline.api import DEFAULT_EMBEDDER, embedder_from_spec, llm_from_spec
+from soundline.application.ask import GenerationSettings
 from soundline.application.ingest import IngestionReport, IngestionStatus
 from soundline.application.prompts import PromptTemplate
 from soundline.domain.answers import AnswerStatus, answer_to_dict
@@ -32,6 +33,7 @@ from soundline.domain.runs import (
     parse_rules,
 )
 from soundline.domain.tracing import render_tree
+from soundline.domain.usage import Usage
 
 # Exit codes (CLI-001)
 USAGE_ERROR = 2
@@ -59,9 +61,13 @@ def _soundline() -> Generator[Soundline]:
     try:
         llm = llm_from_spec(llm_spec) if llm_spec else None
         prompt_dir = os.environ.get("SOUNDLINE_PROMPT")  # GEN-014
-        prompt = PromptTemplate.from_directory(prompt_dir) if prompt_dir else None
+        generation = (
+            GenerationSettings(prompt=PromptTemplate.from_directory(prompt_dir))
+            if prompt_dir
+            else None
+        )
         with Soundline.open(
-            home, llm=llm, embedder=embedder_from_spec(embedder), prompt=prompt
+            home, llm=llm, embedder=embedder_from_spec(embedder), generation=generation
         ) as soundline:
             yield soundline
     except (InvalidFilterError, DatasetError, RunMismatchError) as error:
@@ -178,6 +184,8 @@ def inspect_manifest(as_json: JsonOption = False) -> None:
 def ask(question: str, as_json: JsonOption = False) -> None:
     with _soundline() as soundline:
         answer = soundline.ask(question)
+    if answer.usage.stages:
+        typer.echo(_usage_line(answer.usage), err=True)  # GEN-070, on stderr (CLI-002)
     if as_json:
         typer.echo(json.dumps(answer_to_dict(answer)))
         return
@@ -197,6 +205,18 @@ def ask(question: str, as_json: JsonOption = False) -> None:
         typer.echo(f"{answer.status.value}: unsupported claims were removed:")
         for claim in answer.dropped_claims:
             typer.echo(f"  - {claim}")
+
+
+def _usage_line(usage: Usage) -> str:
+    tokens = usage.tokens
+    cached = tokens.cache_read + tokens.cache_write
+    line = f"usage: {tokens.total_input:,} tokens in"
+    line += f" ({cached:,} cached), " if cached else ", "
+    line += f"{tokens.output:,} out"
+    if usage.cost_usd is not None:
+        return f"{line}, cost ${usage.cost_usd:.4f}"
+    unpriced = sorted({stage.model for stage in usage.stages if stage.cost_usd is None})
+    return f"{line}, cost unknown: no price for {', '.join(unpriced)}"
 
 
 @eval_app.command("run", help="Evaluate retrieval on a JSONL dataset and store the run.")

@@ -8,12 +8,15 @@ import pytest
 from soundline.adapters.llms.anthropic import AnthropicLanguageModel
 from soundline.application.ports import GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
+from soundline.domain.usage import TokenUsage
 
 REQUEST = GenerationRequest(system="Answer from evidence.", prompt="<evidence>...</evidence>")
 ANSWER = '{"claims": [], "insufficient_evidence": "nothing relevant"}'
 
 
-def message(text: str, stop_reason: str = "end_turn") -> dict[str, object]:
+def message(
+    text: str, stop_reason: str = "end_turn", usage: dict[str, int] | None = None
+) -> dict[str, object]:
     return {
         "id": "msg_1",
         "type": "message",
@@ -22,7 +25,7 @@ def message(text: str, stop_reason: str = "end_turn") -> dict[str, object]:
         "content": [{"type": "text", "text": text}],
         "stop_reason": stop_reason,
         "stop_sequence": None,
-        "usage": {"input_tokens": 10, "output_tokens": 5},
+        "usage": usage or {"input_tokens": 10, "output_tokens": 5},
     }
 
 
@@ -50,7 +53,7 @@ def error(kind: str) -> dict[str, object]:
 def test_the_request_asks_for_schema_constrained_json_without_sampling_parameters():
     seen: list[dict[str, object]] = []
 
-    text = model_answering(200, message(ANSWER), seen).generate(REQUEST)
+    text = model_answering(200, message(ANSWER), seen).generate(REQUEST).text
 
     body: Any = seen[0]  # the JSON request body, checked field by field below
     assert text == ANSWER
@@ -93,4 +96,22 @@ def test_a_refusal_is_a_generation_error_not_an_answer():
 def test_a_truncated_output_is_returned_as_is_so_the_parser_rejects_it():
     truncated = model_answering(200, message('{"claims": [{"te', stop_reason="max_tokens"))
 
-    assert truncated.generate(REQUEST) == '{"claims": [{"te'
+    assert truncated.generate(REQUEST).text == '{"claims": [{"te'
+
+
+@pytest.mark.spec("GEN-070")
+def test_the_generation_reports_token_usage_with_cache_reads_and_writes_apart():
+    usage = {
+        "input_tokens": 100,
+        "output_tokens": 20,
+        "cache_read_input_tokens": 3000,
+        "cache_creation_input_tokens": 400,
+    }
+
+    generation = model_answering(200, message(ANSWER, usage=usage)).generate(REQUEST)
+
+    assert generation.usage == TokenUsage(input=100, output=20, cache_read=3000, cache_write=400)
+
+
+def test_the_model_id_names_the_provider():
+    assert model_answering(200, message(ANSWER)).model_id == "anthropic:claude-sonnet-5-5"

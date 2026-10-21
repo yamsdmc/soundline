@@ -5,13 +5,15 @@ import logging
 from typing import Literal
 
 import openai
+from openai.types import CompletionUsage
 from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.shared import ReasoningEffort
 
 from soundline.application.answer_format import ANSWER_SCHEMA
-from soundline.application.ports import GenerationRequest
+from soundline.application.ports import Generation, GenerationRequest
 from soundline.domain.errors import ConfigurationError, GenerationError, ProviderUnavailableError
+from soundline.domain.usage import TokenUsage
 
 _log = logging.getLogger(__name__)
 _NOT_IMPLEMENTED = 501
@@ -36,6 +38,7 @@ class OpenAICompatibleLanguageModel:
         temperature: float | None = None,
         max_tokens: int = 4096,
         reasoning_effort: ReasoningEffort = None,
+        provider: str = "openai",
     ) -> None:
         self._model = model
         self._client = client or openai.OpenAI()  # OPENAI_API_KEY, OPENAI_BASE_URL
@@ -43,8 +46,13 @@ class OpenAICompatibleLanguageModel:
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._reasoning_effort: ReasoningEffort = reasoning_effort
+        self._provider = provider
 
-    def generate(self, request: GenerationRequest) -> str:
+    @property
+    def model_id(self) -> str:
+        return f"{self._provider}:{self._model}"
+
+    def generate(self, request: GenerationRequest) -> Generation:
         try:
             return self._generate(request)
         except _StructuredOutputUnavailableError as error:
@@ -58,7 +66,7 @@ class OpenAICompatibleLanguageModel:
             self._json_mode = "prompt"
             return self._generate(request)
 
-    def _generate(self, request: GenerationRequest) -> str:
+    def _generate(self, request: GenerationRequest) -> Generation:
         messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": request.system},
             {"role": "user", "content": request.prompt},
@@ -102,7 +110,7 @@ class OpenAICompatibleLanguageModel:
             raise GenerationError("the model returned no content (refusal or empty output)")
         # A truncated output (finish_reason "length") is returned as is: the parser rejects it
         # and the use case retries once (GEN-071, GEN-020).
-        return content
+        return Generation(content, _token_usage(response.usage))
 
     def _response_format(self) -> ResponseFormat | openai.Omit:
         if self._json_mode == "prompt":
@@ -113,3 +121,14 @@ class OpenAICompatibleLanguageModel:
             "type": "json_schema",
             "json_schema": {"name": "grounded_answer", "schema": ANSWER_SCHEMA, "strict": True},
         }
+
+
+def _token_usage(usage: CompletionUsage | None) -> TokenUsage:
+    """`prompt_tokens` includes cached tokens; some servers report no usage at all."""
+    if usage is None:
+        return TokenUsage()
+    details = usage.prompt_tokens_details
+    cached = (details.cached_tokens or 0) if details else 0
+    return TokenUsage(
+        input=usage.prompt_tokens - cached, output=usage.completion_tokens, cache_read=cached
+    )

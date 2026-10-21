@@ -3,7 +3,7 @@
 import json
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import cast
 
 from soundline.application.ports import GenerationRequest, LanguageModel, Retriever
@@ -18,6 +18,7 @@ from soundline.domain.answers import (
 )
 from soundline.domain.chunks import Chunk
 from soundline.domain.errors import GenerationError
+from soundline.domain.usage import Price, StageUsage, Usage, price_for
 from soundline.domain.verification import Method, verify_quote
 
 _FENCED = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
@@ -40,19 +41,31 @@ class _ModelOutput:
     lenient: bool
 
 
+@dataclass(frozen=True)
+class GenerationSettings:
+    """The `[generation]` configuration section (docs/spec/09-configuration.md)."""
+
+    k: int = 5
+    prompt: PromptTemplate = DEFAULT_PROMPT  # GEN-014
+    prices: Mapping[str, Price] = field(default_factory=dict[str, Price])  # GEN-070
+
+
 def ask(
     question: str,
     retriever: Retriever,
     llm: LanguageModel,
-    k: int = 5,
-    *,
-    prompt: PromptTemplate = DEFAULT_PROMPT,
+    settings: GenerationSettings | None = None,
 ) -> Answer:
-    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(retriever.search(question, k), 1)}
+    settings = settings or GenerationSettings()
+    prompt = settings.prompt
+    hits = retriever.search(question, settings.k)
+    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(hits, 1)}
     if not evidence:  # GEN-001: no evidence, no model call
         return Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
 
-    output = _generate(llm, prompt.render(question, evidence))
+    calls = _Calls(llm, settings.prices)
+    output = _generate(calls, prompt.render(question, evidence))
+    usage = Usage(tuple(calls.stages))
     if output.insufficient_evidence is not None:  # GEN-021
         return Answer(
             AnswerStatus.ABSTAINED,
@@ -60,6 +73,7 @@ def ask(
             abstention_message=output.insufficient_evidence,
             lenient_parse=output.lenient,
             prompt_version=prompt.version,
+            usage=usage,
         )
 
     verified = [_verified(claim, evidence) for claim in output.claims]
@@ -72,6 +86,7 @@ def ask(
             dropped_claims=dropped,
             lenient_parse=output.lenient,
             prompt_version=prompt.version,
+            usage=usage,
         )
     text, citations = render(supported)
     status = AnswerStatus.PARTIAL if dropped else AnswerStatus.ANSWERED  # GEN-034
@@ -82,13 +97,31 @@ def ask(
         dropped_claims=dropped,
         lenient_parse=output.lenient,
         prompt_version=prompt.version,
+        usage=usage,
     )
 
 
-def _generate(llm: LanguageModel, request: GenerationRequest) -> _ModelOutput:
+class _Calls:
+    """Calls the model and records each call's usage as a stage (GEN-070)."""
+
+    def __init__(self, llm: LanguageModel, prices: Mapping[str, Price]) -> None:
+        self._llm = llm
+        self._prices = prices
+        self.stages: list[StageUsage] = []
+
+    def generate(self, stage: str, request: GenerationRequest) -> str:
+        generation = self._llm.generate(request)
+        model = self._llm.model_id
+        price = price_for(model, self._prices)
+        cost = price.cost(generation.usage) if price else None
+        self.stages.append(StageUsage(stage, model, generation.usage, cost))
+        return generation.text
+
+
+def _generate(calls: _Calls, request: GenerationRequest) -> _ModelOutput:
     """One corrective retry with the validation error, then a GenerationError (GEN-020)."""
     try:
-        return _parse(llm.generate(request))
+        return _parse(calls.generate("generation", request))
     except _InvalidOutputError as first:
         retry = GenerationRequest(
             request.system,
@@ -96,7 +129,7 @@ def _generate(llm: LanguageModel, request: GenerationRequest) -> _ModelOutput:
             "Respond again with JSON only, in one of the two forms above.",
         )
         try:
-            return _parse(llm.generate(retry))
+            return _parse(calls.generate("generation_retry", retry))
         except _InvalidOutputError as second:
             raise GenerationError(
                 f"the model did not follow the output format twice: {second}"

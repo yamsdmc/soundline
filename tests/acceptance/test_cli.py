@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner, Result
 
+from soundline.domain.usage import TokenUsage
 from soundline.interfaces.cli import app
 from soundline.testing import ScriptedLanguageModel
 
@@ -271,3 +272,26 @@ def test_an_invalid_prompt_directory_is_a_configuration_error(
 
     assert result.exit_code == 3
     assert "prompt template" in result.stderr
+
+
+@pytest.mark.spec("GEN-070", "CLI-002")
+def test_ask_reports_tokens_and_cost_on_stderr(
+    run: Run, docs: Path, monkeypatch: pytest.MonkeyPatch
+):
+    scripted = ScriptedLanguageModel(
+        {"claims": [], "insufficient_evidence": "unclear"},
+        usage=TokenUsage(input=8000, output=210, cache_read=1000),
+    )
+    monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
+
+    def scripted_llm(spec: str) -> ScriptedLanguageModel:
+        return scripted
+
+    monkeypatch.setattr("soundline.interfaces.cli.llm_from_spec", scripted_llm)
+    run("ingest", str(docs))
+
+    result = run("ask", "rent due 5th")
+
+    assert "usage: 9,000 tokens in (1,000 cached), 210 out" in result.stderr
+    assert "cost unknown: no price for scripted:test" in result.stderr
+    assert "usage" not in result.stdout

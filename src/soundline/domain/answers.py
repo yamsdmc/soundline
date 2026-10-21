@@ -1,8 +1,9 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 
 from soundline.domain.quotes import Span
+from soundline.domain.usage import Usage
 
 
 class AnswerStatus(Enum):
@@ -53,6 +54,8 @@ class Answer:
     """The model's output needed the lenient parser (GEN-023)."""
     prompt_version: str | None = None
     """The prompt template the model saw; None when the model was not called (GEN-014)."""
+    usage: Usage = field(default_factory=Usage)
+    """Tokens and estimated cost per stage (GEN-070)."""
 
 
 def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
@@ -88,4 +91,17 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
         "abstention_reason": answer.abstention_reason.value if answer.abstention_reason else None,
         "abstention_message": answer.abstention_message,
         "prompt_version": answer.prompt_version,
+        "usage": {
+            "stages": [
+                {
+                    "stage": stage.stage,
+                    "model": stage.model,
+                    "tokens": asdict(stage.tokens),
+                    "cost_usd": stage.cost_usd,
+                }
+                for stage in answer.usage.stages
+            ],
+            "tokens": asdict(answer.usage.tokens),
+            "cost_usd": answer.usage.cost_usd,
+        },
     }

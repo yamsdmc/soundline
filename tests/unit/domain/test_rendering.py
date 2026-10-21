@@ -2,6 +2,7 @@ import pytest
 
 from soundline.domain.answers import Answer, AnswerStatus, Citation, Claim, answer_to_dict, render
 from soundline.domain.quotes import Span
+from soundline.domain.usage import StageUsage, TokenUsage, Usage
 
 RENT = Citation(source="lease.md", quote="Rent is due on the 5th", span=Span(0, 22))
 PETS = Citation(source="lease.md", quote="Pets are allowed", span=Span(24, 40))
@@ -40,3 +41,23 @@ def test_the_json_form_of_an_answer_carries_its_prompt_version():
     answer = Answer(AnswerStatus.ABSTAINED, prompt_version="grounded-v2")
 
     assert answer_to_dict(answer)["prompt_version"] == "grounded-v2"
+
+
+@pytest.mark.spec("GEN-070")
+def test_the_json_form_of_an_answer_carries_its_usage():
+    usage = Usage((StageUsage("generation", "ollama:m", TokenUsage(input=7, output=2), 0.0),))
+
+    data = answer_to_dict(Answer(AnswerStatus.ANSWERED, usage=usage))
+
+    assert data["usage"] == {
+        "stages": [
+            {
+                "stage": "generation",
+                "model": "ollama:m",
+                "tokens": {"input": 7, "output": 2, "cache_read": 0, "cache_write": 0},
+                "cost_usd": 0.0,
+            }
+        ],
+        "tokens": {"input": 7, "output": 2, "cache_read": 0, "cache_write": 0},
+        "cost_usd": 0.0,
+    }

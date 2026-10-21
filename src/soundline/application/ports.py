@@ -9,6 +9,7 @@ from soundline.domain.chunks import Chunk
 from soundline.domain.filters import Filter
 from soundline.domain.manifest import Manifest
 from soundline.domain.runs import EvalRun
+from soundline.domain.usage import TokenUsage
 
 
 @dataclass(frozen=True)
@@ -40,10 +41,20 @@ class GenerationRequest:
     prompt: str
 
 
+@dataclass(frozen=True)
+class Generation:
+    text: str
+    """The model's raw output; parsing it is the application's job."""
+    usage: TokenUsage = field(default_factory=TokenUsage)
+
+
 class LanguageModel(Protocol):
-    def generate(self, request: GenerationRequest) -> str:
-        """Returns the model's raw output; parsing it is the application's job."""
+    @property
+    def model_id(self) -> str:
+        """`<provider>:<model>` (CFG-010), the key of the price table (GEN-070)."""
         ...
+
+    def generate(self, request: GenerationRequest) -> Generation: ...
 
 
 type Vector = tuple[float, ...]

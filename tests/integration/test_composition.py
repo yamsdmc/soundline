@@ -18,6 +18,7 @@ def test_ollama_models_run_locally_through_the_openai_compatible_adapter(
     assert str(llm._client.base_url).startswith("http://localhost:11434/v1")  # pyright: ignore[reportPrivateUsage]
     # Thinking models answer in seconds instead of minutes; the code verifies the answer anyway.
     assert llm._reasoning_effort == "none"  # pyright: ignore[reportPrivateUsage]
+    assert llm.model_id == "ollama:llama3.2"  # free in the price table (GEN-070)
 
 
 @pytest.mark.spec("CFG-010")
