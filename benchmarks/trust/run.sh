@@ -4,6 +4,8 @@
 #
 #   make bench-trust                       # qwen3.5:9b generates and judges
 #   MODEL=qwen3.5:9b JUDGE=anthropic:claude-opus-5-5 make bench-trust
+#   JUDGE=ollama:gemma3:12b OUTPUT=benchmarks/trust/results-gemma-judge.md \
+#     SOUNDLINE_HOME=.soundline-bench-gemma make bench-trust   # a judge of another family
 #
 # SOUNDLINE_HOME is kept between runs: model calls are cached (EVL-061), so a rerun is free
 # and reproduces the same numbers. Delete it, or set FRESH=1, to call the models again.
@@ -12,6 +14,7 @@ cd "$(dirname "$0")/../.."
 MODEL="${MODEL:-qwen3.5:9b}"
 JUDGE="${JUDGE:-ollama:$MODEL}"
 DATASET="${DATASET:-evals/trust-fr/dataset.jsonl}"
+OUTPUT="${OUTPUT:-benchmarks/trust/results.md}"
 CORPORA=(evals/logement-fr/corpus "${TRUST_CORPUS:-evals/trust-fr/corpus}")
 export SOUNDLINE_HOME="${SOUNDLINE_HOME:-.soundline-bench}"
 export SOUNDLINE_EMBEDDER=fastembed:intfloat/multilingual-e5-large
@@ -30,4 +33,4 @@ if [[ -n "${FRESH:-}" || ! -s "$answers" ]]; then
 fi
 uv run python benchmarks/trust/trust_report.py --home "$SOUNDLINE_HOME" --dataset "$DATASET" \
   --naive-answers "$answers" --model "$MODEL" --judge "$JUDGE" \
-  --output benchmarks/trust/results.md
+  --output "$OUTPUT"
