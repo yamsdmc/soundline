@@ -1,6 +1,8 @@
 import json
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import pytest
 from typer.testing import CliRunner, Result
@@ -358,9 +360,9 @@ def test_ask_open_writes_the_viewer_and_opens_it(
     assert result.exit_code == 0, result.output
     assert "Rent is due on the 5th [1]." in result.stdout
     assert len(opened) == 1
-    page = Path(opened[0].removeprefix("file://"))
-    assert page.parent == tmp_path / "home" / "views"
-    assert "<mark>Rent is due on the 5th</mark>" in page.read_text()
+    page = Path(url2pathname(urlparse(opened[0]).path))  # file:///C:/... on Windows
+    assert page.parent == (tmp_path / "home" / "views").resolve()
+    assert "<mark>Rent is due on the 5th</mark>" in page.read_text(encoding="utf-8")
 
 
 @pytest.mark.spec("MCP-003", "MCP-004")

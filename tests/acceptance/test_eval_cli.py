@@ -278,7 +278,7 @@ def test_labels_exported_from_a_judged_run_calibrate_the_judge_for_later_runs(
     later = run("eval", "run", str(dataset), "--judge", "scripted:judge")
 
     assert exported.exit_code == 0, exported.output
-    assert len(labels.read_text().splitlines()) == len(TOPICS)
+    assert len(labels.read_text(encoding="utf-8").splitlines()) == len(TOPICS)
     assert calibrated.exit_code == 0, calibrated.output
     assert "accuracy 1.000" in calibrated.stdout
     assert f"{len(TOPICS)} labels not reviewed" in calibrated.stdout

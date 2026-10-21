@@ -430,7 +430,9 @@ def eval_gate(
 ) -> None:
     with _soundline() as soundline:
         outcomes = gate(
-            soundline.load_run(baseline), soundline.load_run(run), parse_rules(rules.read_text())
+            soundline.load_run(baseline),
+            soundline.load_run(run),
+            parse_rules(rules.read_text(encoding="utf-8")),
         )
     for outcome in outcomes:
         typer.echo(f"{'pass' if outcome.passed else 'FAIL'}  {outcome.explanation}")
