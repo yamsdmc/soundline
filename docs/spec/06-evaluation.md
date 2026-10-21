@@ -93,6 +93,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
 - **EVL-042** Judges SHOULD use a different model family than the generator when available, and the run report MUST state judge models.
 - **EVL-043** **Judge calibration**: `soundline eval calibrate` runs a judge on a human-labeled calibration set and reports agreement (accuracy and Cohen's κ). The report MUST display the judge's calibration status next to judge metrics ("uncalibrated" when unknown).
 - **EVL-044** Judges MUST NOT see which configuration produced an answer (blind evaluation). When comparing two runs pairwise, the presentation order is randomized with a recorded seed.
+- **EVL-045** **Correctness** is judged case by case: the answer's claims, as plain text (no markers, no citations, nothing that tells which system wrote them), against the question and the case's `reference_answer`. The verdict is `correct` (1), `partial` (0.5: right but missing or blurring part of the reference) or `incorrect` (0: contradicts the reference or answers another question). It is scored on answered cases that have a reference answer; abstentions count in `answer_rate`, not here, so the two metrics read together.
 
 ## Statistics
 

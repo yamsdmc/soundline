@@ -1,0 +1,13 @@
+<question>
+$question
+</question>
+
+<reference>
+$reference
+</reference>
+
+<answer>
+$answer
+</answer>
+
+Respond with JSON only: {"rationale": "<one or two sentences>", "verdict": "correct", "partial" or "incorrect"}

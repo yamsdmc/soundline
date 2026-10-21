@@ -303,7 +303,10 @@ def eval_run(  # noqa: PLR0913, PLR0917  # one parameter per command-line option
     ] = False,
     judge: Annotated[
         str | None,
-        typer.Option(help="Judge model for faithfulness, e.g. anthropic:claude-opus-5-5."),
+        typer.Option(
+            help="Judge model for faithfulness, and correctness when cases have a"
+            " reference answer, e.g. anthropic:claude-opus-5-5."
+        ),
     ] = None,
     without_verification: Annotated[
         bool,

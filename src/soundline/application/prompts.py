@@ -16,6 +16,7 @@ from typing import Self
 from soundline.application.answer_format import (
     ANSWER_FORMAT,
     CONDENSE_FORMAT,
+    CORRECTNESS_FORMAT,
     FAITHFULNESS_FORMAT,
 )
 from soundline.application.ports import GenerationRequest
@@ -28,6 +29,7 @@ from soundline.domain.languages import detect_language, language_name
 GROUNDED_PLACEHOLDERS = ("history", "evidence", "question", "language_instruction")
 CONDENSE_PLACEHOLDERS = ("history", "question")
 FAITHFULNESS_PLACEHOLDERS = ("claim", "quotes")
+CORRECTNESS_PLACEHOLDERS = ("question", "reference", "answer")
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,16 @@ def faithfulness_request(template: PromptTemplate, claim: Claim) -> GenerationRe
     return GenerationRequest(template.system, user, FAITHFULNESS_FORMAT)
 
 
+def correctness_request(
+    template: PromptTemplate, question: str, reference: str, answer: str
+) -> GenerationRequest:
+    """The answer as plain text, blind to the system that wrote it (EVL-044, EVL-045)."""
+    user = template.user.substitute(
+        question=_escaped(question), reference=_escaped(reference), answer=_escaped(answer)
+    )
+    return GenerationRequest(template.system, user, CORRECTNESS_FORMAT)
+
+
 def _history(turns: Sequence[Turn]) -> str:
     """Previous questions and answers, text only (GEN-063), escaped like evidence."""
     rendered = "\n".join(
@@ -137,7 +149,7 @@ def _text(directory: Traversable, name: str) -> str:
         raise ConfigurationError(f"prompt template {name} not found in {directory}") from error
 
 
-_TAGS = ("evidence", "history", "turn", "claim", "quote")
+_TAGS = ("evidence", "history", "turn", "claim", "quote", "question", "reference", "answer")
 
 
 def _section(path: Sequence[str]) -> str:
@@ -160,3 +172,4 @@ def _escaped(text: str) -> str:
 DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v5")
 CONDENSE_PROMPT = PromptTemplate.packaged("condense-v1", CONDENSE_PLACEHOLDERS)
 FAITHFULNESS_PROMPT = PromptTemplate.packaged("faithfulness-v2", FAITHFULNESS_PLACEHOLDERS)
+CORRECTNESS_PROMPT = PromptTemplate.packaged("correctness-v1", CORRECTNESS_PLACEHOLDERS)

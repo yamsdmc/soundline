@@ -16,7 +16,7 @@ from soundline.application.evaluate import DatasetFile, EvalSettings, Generator,
 from soundline.application.hybrid_retriever import HybridRetriever
 from soundline.application.ingest import IngestionReport, IngestionStatus, Ingestor
 from soundline.application.ingest_sources import ingest_sources
-from soundline.application.judges import FaithfulnessJudge
+from soundline.application.judges import CorrectnessJudge, FaithfulnessJudge
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import (
     Embedder,
@@ -244,7 +244,8 @@ class Soundline:
         """Evaluates a JSONL dataset and stores the run (EVL-060): end to end when a language
         model is configured, retrieval-only otherwise or on request (EVL-062). Model calls
         are cached by input, so a rerun is reproducible and free; `no_cache` forces fresh
-        calls (EVL-061). A `judge` model adds faithfulness, claim by claim (EVL-021).
+        calls (EVL-061). A `judge` model adds faithfulness, claim by claim (EVL-021), and
+        correctness against each case's reference answer when it has one (EVL-045).
         `without_verification` shows claims as the model wrote them, to measure what
         verification brings (GEN-080, EVL-092)."""
         check_pipeline(self._index.manifest, self._manifest)
@@ -268,6 +269,7 @@ class Soundline:
                 },
                 FaithfulnessJudge(judge) if judge else None,
                 self._calibration_of(judge),
+                CorrectnessJudge(judge) if judge else None,
             )
         run = run_eval(
             name or datetime.now(UTC).strftime("run-%Y%m%d-%H%M%S"),

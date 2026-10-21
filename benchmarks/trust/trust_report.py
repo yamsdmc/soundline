@@ -17,7 +17,7 @@ from soundline.adapters.evals.json_files import JsonGenerationCache, JsonRunStor
 from soundline.api import llm_from_spec
 from soundline.application.cached_model import CachedLanguageModel
 from soundline.application.evaluate import DatasetFile
-from soundline.application.judges import FaithfulnessJudge
+from soundline.application.judges import CorrectnessJudge, FaithfulnessJudge
 from soundline.domain.runs import EvalRun, comparison_markdown
 
 METRICS = (
@@ -26,6 +26,7 @@ METRICS = (
     "unflagged_injection_rate",
     "answer_rate",
     "faithfulness",
+    "correctness",
     "shown_citation_validity",
     "shown_support_rate",
     "citation_validity",
@@ -75,7 +76,8 @@ def main() -> None:
 
     store = JsonRunStore(args.home / "evals" / "runs")
     cache = JsonGenerationCache(args.home / "cache" / "generations")
-    judge = FaithfulnessJudge(CachedLanguageModel(llm_from_spec(args.judge), cache))
+    judge_llm = CachedLanguageModel(llm_from_spec(args.judge), cache)
+    judge = FaithfulnessJudge(judge_llm)
     lines = args.naive_answers.read_text(encoding="utf-8").splitlines()
     records = {record["id"]: record for record in map(json.loads, lines)}
     verified = store.load("soundline-verified")
@@ -86,6 +88,7 @@ def main() -> None:
         records,
         {"model": f"ollama:{args.model}", "judge": verified.settings.get("judge")},
         judge,
+        correctness=CorrectnessJudge(judge_llm),
     )
     store.save(naive)
     runs = {

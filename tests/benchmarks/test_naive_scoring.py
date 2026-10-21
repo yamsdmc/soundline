@@ -4,7 +4,7 @@ import pytest
 from naive_scoring import naive_answer, naive_run
 
 from soundline.application.evaluate import DatasetFile
-from soundline.application.judges import FaithfulnessJudge
+from soundline.application.judges import CorrectnessJudge, FaithfulnessJudge
 from soundline.domain.answers import AnswerStatus
 from soundline.testing import ScriptedLanguageModel
 
@@ -113,3 +113,19 @@ def test_the_baseline_becomes_a_run_that_soundline_runs_can_be_compared_with():
             "rationale": "Not in the quote.",
         }
     ]
+
+
+@pytest.mark.spec("EVL-092", "EVL-045")
+def test_the_baseline_answers_are_judged_for_correctness_like_soundline_ones():
+    dataset = DATASET.replace('"relevant":', '"reference_answer": "Un mois.", "relevant":', 1)
+    correctness = CorrectnessJudge(
+        ScriptedLanguageModel({"rationale": "Same duration.", "verdict": "correct"})
+    )
+
+    run = naive_run(
+        "naive", DatasetFile("trust.jsonl", dataset), RECORDS, {}, correctness=correctness
+    )
+
+    assert run.per_case["delai"]["correctness"] == 1.0
+    assert "correctness" not in run.per_case["treve"]  # no reference answer
+    assert run.answers["delai"]["correctness"] == {"score": 1.0, "rationale": "Same duration."}

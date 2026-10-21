@@ -11,8 +11,8 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from soundline.application.evaluate import DatasetFile, judge_claims
-from soundline.application.judges import FaithfulnessJudge
+from soundline.application.evaluate import DatasetFile, judge_claims, judge_correctness
+from soundline.application.judges import CorrectnessJudge, FaithfulnessJudge
 from soundline.domain.answers import (
     AbstentionReason,
     Answer,
@@ -73,12 +73,14 @@ _QUOTE_METRICS = (
 _OPERATIONS = ("latency_ms", "tokens_in", "tokens_out")
 
 
-def naive_run(
+def naive_run(  # noqa: PLR0913  # keyword-only judges
     name: str,
     dataset_file: DatasetFile,
     records: Mapping[str, Mapping[str, Any]],
     settings: Mapping[str, object],
     judge: FaithfulnessJudge | None = None,
+    *,
+    correctness: CorrectnessJudge | None = None,
 ) -> EvalRun:
     """The baseline's answers as a run, with the dataset hash of Soundline's runs on the same
     file, so that `soundline eval compare` pairs them case by case (EVL-051)."""
@@ -95,6 +97,12 @@ def naive_run(
         answers[case.id] = answer_to_dict(answer)
         if judge is not None:
             answers[case.id]["judgments"], _ = judge_claims(judge, answer, metrics)
+        if correctness is not None and case.reference_answer is not None:
+            verdict = judge_correctness(
+                correctness, case.question, case.reference_answer, answer, metrics
+            )
+            if verdict is not None:
+                answers[case.id]["correctness"] = verdict
         per_case[case.id] = metrics
     return EvalRun(
         name=name,

@@ -129,6 +129,7 @@ def test_a_judge_scores_faithfulness_and_the_run_keeps_its_verdicts(dataset: Pat
         "model": "anthropic:judge",
         "version": "faithfulness-v2",
         "calibration": "uncalibrated",
+        "correctness_version": "correctness-v1",
     }
     verdicts = run.answers["rent-due"]["judgments"]
     assert verdicts == [
@@ -211,3 +212,33 @@ def test_an_end_to_end_run_scores_injections_on_cases_with_forbidden_phrases(tmp
     run = soundline.evaluate(path, "trust")
 
     assert run.per_case["parking"]["injection_success_rate"] == 1.0
+
+
+@pytest.mark.spec("EVL-021", "EVL-045", "EVL-044")
+def test_a_judge_scores_correctness_against_the_reference_answer_blind(tmp_path: Path):
+    path = tmp_path / "references.jsonl"
+    cases = [
+        CASES[0] | {"reference_answer": "On the 5th of each month."},
+        CASES[1] | {"reference_answer": "The lease does not say."},
+    ]
+    path.write_text("\n".join(json.dumps(case) for case in cases))
+    soundline = Soundline.in_memory(llm=scripted())
+    soundline.ingest_text("lease.md", LEASE)
+    judge = ScriptedLanguageModel(
+        {"rationale": "The quote states it.", "entailed": True},
+        {"rationale": "The day is right, the month is implied.", "verdict": "partial"},
+        model_id="anthropic:judge",
+    )
+
+    run = soundline.evaluate(path, judge=judge)
+
+    assert run.per_case["rent-due"]["correctness"] == 0.5
+    assert "correctness" not in run.per_case["parking"]  # abstained: counted by answer_rate
+    assert run.answers["rent-due"]["correctness"] == {
+        "score": 0.5,
+        "rationale": "The day is right, the month is implied.",
+    }
+    assert run.settings["judge"]["correctness_version"] == "correctness-v1"  # type: ignore[index]
+    prompt = judge.requests[1].prompt
+    assert "Rent is due on the 5th." in prompt
+    assert [s for s in ("[1]", "lease.md", "ollama") if s in prompt] == []  # blind (EVL-044)

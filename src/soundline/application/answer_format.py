@@ -72,3 +72,17 @@ FAITHFULNESS_FORMAT = OutputFormat(
         "additionalProperties": False,
     },
 )
+
+# A judge's verdict on a whole answer against the reference, rationale first (EVL-045).
+CORRECTNESS_FORMAT = OutputFormat(
+    "correctness_verdict",
+    {
+        "type": "object",
+        "properties": {
+            "rationale": {"type": "string"},
+            "verdict": {"type": "string", "enum": ["correct", "partial", "incorrect"]},
+        },
+        "required": ["rationale", "verdict"],
+        "additionalProperties": False,
+    },
+)

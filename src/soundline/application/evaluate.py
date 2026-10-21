@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 
-from soundline.application.judges import FaithfulnessJudge
+from soundline.application.judges import CorrectnessJudge, FaithfulnessJudge
 from soundline.application.ports import DocumentStore, Index
-from soundline.domain.answers import Answer, answer_to_dict
+from soundline.domain.answers import Answer, AnswerStatus, answer_to_dict
 from soundline.domain.datasets import Dataset, DatasetError, RelevantQuote, parse_dataset
 from soundline.domain.evaluation import Located, generation_metrics, retrieval_metrics
 from soundline.domain.hits import Hit
@@ -116,6 +116,8 @@ class Generator:
     """Optional, enabled explicitly (EVL-021)."""
     judge_calibration: str = "uncalibrated"
     """Shown next to judge metrics (EVL-043)."""
+    correctness: CorrectnessJudge | None = None
+    """Scores answers against reference answers (EVL-045)."""
 
 
 _OPERATIONS = (
@@ -173,6 +175,14 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
                 judged, failed = judge_claims(generator.judge, answer, metrics)
                 answers[case.id]["judgments"] = judged
                 unreadable += failed
+            if generator.correctness is not None and case.reference_answer is not None:
+                verdict = judge_correctness(
+                    generator.correctness, case.question, case.reference_answer, answer, metrics
+                )
+                if verdict is not None:
+                    answers[case.id]["correctness"] = verdict
+                elif answer.status is not AnswerStatus.ABSTAINED and answer.claims:
+                    unreadable += 1
         if metrics:
             per_case[case.id] = metrics
     manifest = index.manifest.load()
@@ -180,11 +190,14 @@ def run_eval(  # noqa: PLR0913  # keyword-only collaborators
     if generator is not None:
         mode = {"mode": "end-to-end", **generator.settings}
         if generator.judge is not None:
-            mode["judge"] = {
+            judge: dict[str, object] = {
                 "model": generator.judge.model_id,
                 "version": generator.judge.version,
                 "calibration": generator.judge_calibration,  # EVL-043
             }
+            if generator.correctness is not None:
+                judge["correctness_version"] = generator.correctness.version
+            mode["judge"] = judge
     return EvalRun(
         name=name,
         created_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -232,6 +245,29 @@ def judge_claims(
     metrics["judge_tokens_in"] = float(spent.total_input)
     metrics["judge_tokens_out"] = float(spent.output)
     return verdicts, failed
+
+
+def judge_correctness(
+    judge: CorrectnessJudge,
+    question: str,
+    reference: str,
+    answer: Answer,
+    metrics: dict[str, float],
+) -> dict[str, object] | None:
+    """Correctness of an answered case against its reference, the claims read as plain text
+    so the judge cannot tell which system wrote them (EVL-044, EVL-045). None when the case
+    abstained or the verdict cannot be read."""
+    if answer.status is AnswerStatus.ABSTAINED or not answer.claims:
+        return None
+    before = judge.usage
+    judgment = judge.judge(question, reference, " ".join(claim.text for claim in answer.claims))
+    spent = judge.usage - before
+    metrics["judge_tokens_in"] = metrics.get("judge_tokens_in", 0.0) + spent.total_input
+    metrics["judge_tokens_out"] = metrics.get("judge_tokens_out", 0.0) + spent.output
+    if judgment is None:
+        return None
+    metrics["correctness"] = judgment.score
+    return {"score": judgment.score, "rationale": judgment.rationale}
 
 
 def _cache_warnings(cache_hits: int) -> list[str]:
