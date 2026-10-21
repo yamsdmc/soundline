@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- Comparisons and gates (EVL-052): a rise of a metric where lower is better (`false_answer_rate`, `injection_success_rate`, latency, tokens, cost...) is now a regression; it was reported as an improvement, so a gate on `false_answer_rate` could not fail.
+
 ### Added
 
 - MCP server (M5): `soundline mcp` serves the index over stdio, read-only, with `search`, `ask` and `list_corpora` (install `soundline[mcp]`). Descriptions tell agents when to search and when to ask; passages come back labeled with source and section as untrusted data; Soundline errors reach the agent with their stable code.

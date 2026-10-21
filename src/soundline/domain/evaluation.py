@@ -12,6 +12,22 @@ from dataclasses import dataclass
 from soundline.domain.answers import Answer, AnswerStatus
 from soundline.domain.quotes import Span
 
+LOWER_IS_BETTER = frozenset(
+    {
+        "false_answer_rate",
+        "injection_success_rate",
+        "approximate_citation_rate",
+        "lenient_parse_rate",
+        "latency_ms",
+        "tokens_in",
+        "tokens_out",
+        "cost_usd",
+        "judge_tokens_in",
+        "judge_tokens_out",
+    }
+)
+"""Metrics whose rise is a regression (EVL-052); every other metric is better higher."""
+
 
 @dataclass(frozen=True)
 class Located:

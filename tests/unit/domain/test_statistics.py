@@ -80,3 +80,11 @@ def test_operational_metrics_are_summarized_by_mean_percentiles_and_total():
 
     assert summary == {"mean": 50.5, "p50": 50.5, "p95": pytest.approx(95.05), "total": 5050.0}
     assert describe([]) == {"mean": 0.0, "p50": 0.0, "p95": 0.0, "total": 0.0}
+
+
+@pytest.mark.spec("EVL-052")
+def test_when_lower_is_better_a_rise_is_a_regression():
+    zeros = dict.fromkeys(SCORES, 0.0)
+
+    assert compare_paired(zeros, SCORES, 0.02, lower_is_better=True).verdict is Verdict.REGRESSED
+    assert compare_paired(SCORES, zeros, 0.02, lower_is_better=True).verdict is Verdict.IMPROVED

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, cast
 
 from soundline.domain.errors import SoundlineError
+from soundline.domain.evaluation import LOWER_IS_BETTER
 from soundline.domain.statistics import Comparison, Estimate, Verdict, compare_paired
 
 
@@ -79,6 +80,7 @@ def compare_runs(baseline: EvalRun, run: EvalRun, tolerance: float = 0.0) -> dic
             {c: m[name] for c, m in baseline.per_case.items() if name in m},
             {c: m[name] for c, m in run.per_case.items() if name in m},
             tolerance,
+            lower_is_better=name in LOWER_IS_BETTER,
         )
         for name in baseline.metrics
         if name in run.metrics

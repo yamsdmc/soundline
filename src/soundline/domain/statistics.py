@@ -54,20 +54,25 @@ def bootstrap_mean(
     return Estimate(math.fsum(values) / n, low, high, n)
 
 
-def compare_paired(
+def compare_paired(  # noqa: PLR0913  # keyword-only options
     before: Mapping[str, float],
     after: Mapping[str, float],
     tolerance: float,
     resamples: int = 2000,
     seed: int = 42,
+    *,
+    lower_is_better: bool = False,
 ) -> Comparison:
     """Per-case differences on the cases both runs share (EVL-051). A verdict needs the whole
     interval of the difference beyond the tolerance (EVL-052)."""
     shared = before.keys() & after.keys()
     difference = bootstrap_mean({c: after[c] - before[c] for c in shared}, resamples, seed)
-    if difference.high < -tolerance:
+    worse, better = (difference.low > tolerance, difference.high < -tolerance)
+    if not lower_is_better:
+        worse, better = better, worse
+    if worse:
         verdict = Verdict.REGRESSED
-    elif difference.low > tolerance:
+    elif better:
         verdict = Verdict.IMPROVED
     else:
         verdict = Verdict.NO_SIGNIFICANT_CHANGE
