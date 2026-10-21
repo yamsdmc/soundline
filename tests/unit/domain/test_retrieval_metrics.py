@@ -67,10 +67,9 @@ def test_no_hits_scores_zero_and_perfect_hits_score_one():
 positions = st.integers(0, 50).map(lambda start: at(start * 10, start * 10 + 15))
 
 
+@pytest.mark.spec("INV-EVL-1", "INV-EVL-2")
 @given(st.lists(positions, min_size=1, max_size=4), st.lists(positions, max_size=10))
-def test_metrics_are_bounded_and_recall_grows_with_k(  # INV-EVL-1, INV-EVL-2
-    quotes: list[Located], hits: list[Located]
-):
+def test_metrics_are_bounded_and_recall_grows_with_k(quotes: list[Located], hits: list[Located]):
     metrics = retrieval_metrics(quotes, hits, ks=(1, 3, 5, 10))
 
     assert all(0.0 <= value <= 1.0 for value in metrics.values())

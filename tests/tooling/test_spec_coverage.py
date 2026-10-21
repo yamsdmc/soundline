@@ -112,3 +112,15 @@ def test_cli_reads_spec_markers_from_every_given_test_directory(
     main([str(spec_dir), str(tests_dir), str(contracts_dir)])
 
     assert "covered:  1/2" in capsys.readouterr().out
+
+
+def test_invariants_are_definitions_too():
+    markdown = "- **INV-EVL-3** Comparing a run with itself yields zero differences."
+
+    assert set(defined_behaviors(markdown)) == {"INV-EVL-3"}
+
+
+def test_an_invariant_with_a_label_is_still_a_definition():
+    markdown = "- **INV-ING-1 (span fidelity)** For every chunk c of document d: ..."
+
+    assert set(defined_behaviors(markdown)) == {"INV-ING-1"}

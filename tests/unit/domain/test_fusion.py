@@ -50,6 +50,7 @@ def test_each_hit_explains_its_rank_in_every_retriever_including_absences():
     }
 
 
+@pytest.mark.spec("INV-RET-2")
 @given(lexical=rankings, dense=rankings)
 def test_fusion_is_a_permutation_of_the_union_of_its_inputs(lexical: list[str], dense: list[str]):
     fused = [hit.item for hit in fuse({"lexical": lexical, "dense": dense})]
@@ -57,6 +58,7 @@ def test_fusion_is_a_permutation_of_the_union_of_its_inputs(lexical: list[str], 
     assert sorted(fused) == sorted(set(lexical) | set(dense))
 
 
+@pytest.mark.spec("INV-RET-6")
 @given(lexical=rankings, dense=rankings, ignored=rankings)
 def test_adding_a_zero_weight_retriever_never_changes_the_result(
     lexical: list[str], dense: list[str], ignored: list[str]

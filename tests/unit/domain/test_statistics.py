@@ -24,8 +24,9 @@ def test_identical_scores_have_a_zero_width_interval():
     assert (estimate.low, estimate.mean, estimate.high) == (0.5, 0.5, 0.5)
 
 
+@pytest.mark.spec("INV-EVL-3")
 @pytest.mark.spec("EVL-051", "EVL-052")
-def test_a_run_compared_with_itself_shows_no_significant_change():  # INV-EVL-3
+def test_a_run_compared_with_itself_shows_no_significant_change():
     comparison = compare_paired(SCORES, SCORES, tolerance=0.02)
 
     assert comparison.difference.mean == 0.0
@@ -65,8 +66,9 @@ def test_a_dataset_too_small_for_the_tolerance_is_flagged():
     assert not compare_paired(many, many, tolerance=0.02).too_few_cases
 
 
+@pytest.mark.spec("INV-EVL-4")
 @given(st.dictionaries(st.text(min_size=1, max_size=4), st.floats(0, 1), min_size=1, max_size=30))
-def test_results_do_not_depend_on_case_order(scores: dict[str, float]):  # INV-EVL-4
+def test_results_do_not_depend_on_case_order(scores: dict[str, float]):
     reversed_order = dict(reversed(list(scores.items())))
 
     assert bootstrap_mean(scores, resamples=200) == bootstrap_mean(reversed_order, resamples=200)

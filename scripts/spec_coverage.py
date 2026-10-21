@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-_DEFINITION = re.compile(r"\*\*([A-Z]{3,4}-\d{3})\*\*")
+_DEFINITION = re.compile(r"\*\*(INV-[A-Z]{3}-\d+|[A-Z]{3,4}-\d{3})(?: \([^)*]*\))?\*\*")
 _MANDATORY = re.compile(r"\b(MUST|SHOULD)\b")
 _OPTIONAL = re.compile(r"\bMAY\b")
 

@@ -44,6 +44,7 @@ def test_the_end_of_the_text_maps_to_the_end_of_the_original():
 nasty_text = st.text(alphabet=st.sampled_from("ab é́\t\r\n "), max_size=40)
 
 
+@pytest.mark.spec("INV-ING-6")
 @given(nasty_text)
 def test_normalization_is_idempotent(raw: str):
     once = normalize(raw).text

@@ -113,15 +113,15 @@ def chunked(document: ParsedDocument, max_tokens: int) -> list[str]:
     ]
 
 
+@pytest.mark.spec("INV-ING-4")
 @given(documents, st.integers(1, 12))
-def test_every_chunk_fits_the_limit(document: ParsedDocument, max_tokens: int):  # INV-ING-4
+def test_every_chunk_fits_the_limit(document: ParsedDocument, max_tokens: int):
     assert all(words(text) <= max_tokens for text in chunked(document, max_tokens))
 
 
+@pytest.mark.spec("INV-ING-2")
 @given(documents, st.integers(1, 12))
-def test_chunks_cover_every_non_whitespace_character(  # INV-ING-2
-    document: ParsedDocument, max_tokens: int
-):
+def test_chunks_cover_every_non_whitespace_character(document: ParsedDocument, max_tokens: int):
     covered = [False] * len(document.text)
     for c in chunk_document(document, max_tokens=max_tokens, count_tokens=words):
         covered[c.span.start : c.span.end] = [True] * (c.span.end - c.span.start)
@@ -129,10 +129,9 @@ def test_chunks_cover_every_non_whitespace_character(  # INV-ING-2
     assert all(covered[i] for i, char in enumerate(document.text) if not char.isspace())
 
 
+@pytest.mark.spec("INV-ING-3", "INV-ING-5")
 @given(documents, st.integers(1, 12))
-def test_chunks_are_ordered_non_empty_and_deterministic(  # INV-ING-3, INV-ING-5
-    document: ParsedDocument, max_tokens: int
-):
+def test_chunks_are_ordered_non_empty_and_deterministic(document: ParsedDocument, max_tokens: int):
     first = chunk_document(document, max_tokens=max_tokens, count_tokens=words)
     spans = [c.span for c in first]
 
@@ -167,8 +166,9 @@ def test_a_single_word_longer_than_the_limit_is_cut_as_a_last_resort():
     assert "".join(texts).replace(" ", "") == f"See{url}now."
 
 
+@pytest.mark.spec("INV-ING-4")
 @given(documents, st.integers(1, 6))
-def test_every_chunk_fits_the_limit_whatever_the_tokenizer(  # INV-ING-4
+def test_every_chunk_fits_the_limit_whatever_the_tokenizer(
     document: ParsedDocument, max_tokens: int
 ):
     for c in chunk_document(document, max_tokens=max_tokens, count_tokens=four_chars_per_token):

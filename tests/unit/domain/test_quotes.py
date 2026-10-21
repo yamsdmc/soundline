@@ -1,3 +1,4 @@
+import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
@@ -19,6 +20,7 @@ def test_an_empty_or_blank_quote_proves_nothing_and_is_not_located():
     assert locate_quote("   ", "Rent is due   on the 5th.") is None
 
 
+@pytest.mark.spec("INV-GEN-1")
 @given(text=st.text(), data=st.data())
 def test_a_located_span_always_points_at_the_quote_in_the_text(text: str, data: st.DataObject):
     start = data.draw(st.integers(0, len(text)))
