@@ -127,7 +127,7 @@ def test_a_judge_scores_faithfulness_and_the_run_keeps_its_verdicts(dataset: Pat
     assert "faithfulness" not in run.per_case["parking"]  # no claim to judge
     assert run.settings["judge"] == {
         "model": "anthropic:judge",
-        "version": "faithfulness-v1",
+        "version": "faithfulness-v2",
         "calibration": "uncalibrated",
     }
     verdicts = run.answers["rent-due"]["judgments"]

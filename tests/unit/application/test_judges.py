@@ -35,7 +35,7 @@ def test_a_claim_is_judged_against_its_cited_quotes_only():
 
 @pytest.mark.spec("EVL-040")
 def test_the_judge_is_versioned():
-    assert FaithfulnessJudge(ScriptedLanguageModel()).version == "faithfulness-v1"
+    assert FaithfulnessJudge(ScriptedLanguageModel()).version == "faithfulness-v2"
 
 
 @pytest.mark.spec("EVL-040")
