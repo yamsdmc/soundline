@@ -1,3 +1,4 @@
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
@@ -42,6 +43,16 @@ class Claim:
 
 
 @dataclass(frozen=True)
+class QueryInfo:
+    question: str
+    search_query: str
+    """What the retrievers saw: the question, or a follow-up condensed (RET-071)."""
+    history_turns: int = 0
+    history_dropped: int = 0
+    """Older turns left out of the prompt to fit its budget (GEN-062)."""
+
+
+@dataclass(frozen=True)
 class Answer:
     status: AnswerStatus
     text: str = ""
@@ -56,6 +67,9 @@ class Answer:
     """The prompt template the model saw; None when the model was not called (GEN-014)."""
     usage: Usage = field(default_factory=Usage)
     """Tokens and estimated cost per stage (GEN-070)."""
+    query: QueryInfo | None = None
+    warnings: tuple[str, ...] = ()
+    """Degradations that did not prevent an answer, e.g. a failed condensation (RET-073)."""
 
 
 def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
@@ -71,6 +85,17 @@ def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
         closing = claim.text[len(body) :]
         sentences.append(f"{body} {markers}{closing}")
     return " ".join(sentences), numbered
+
+
+_MARKER = re.compile(r" \[\d+\]")
+
+
+def history_text(answer: Answer) -> str:
+    """The answer as a previous turn: text without [n] markers, whose citations are not
+    carried over (GEN-063)."""
+    if answer.status is AnswerStatus.ABSTAINED:
+        return f"(no answer: {answer.abstention_message or 'the documents do not say'})"
+    return _MARKER.sub("", answer.text)
 
 
 def answer_to_dict(answer: Answer) -> dict[str, object]:
@@ -91,6 +116,8 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
         "abstention_reason": answer.abstention_reason.value if answer.abstention_reason else None,
         "abstention_message": answer.abstention_message,
         "prompt_version": answer.prompt_version,
+        "query": asdict(answer.query) if answer.query else None,
+        "warnings": list(answer.warnings),
         "usage": {
             "stages": [
                 {

@@ -241,7 +241,7 @@ def test_the_answer_records_the_prompt_version():
 
     answer = ask("When is rent due?", index_with_lease(), llm)
 
-    assert answer.prompt_version == "grounded-v2"
+    assert answer.prompt_version == "grounded-v3"
 
 
 @pytest.mark.spec("GEN-014")
@@ -249,7 +249,7 @@ def test_a_custom_prompt_is_used_and_recorded(tmp_path: Path):
     directory = tmp_path / "terse-v2"
     directory.mkdir()
     (directory / "system.txt").write_text("Terse.")
-    (directory / "user.txt").write_text("$evidence\n$question\n$language_instruction")
+    (directory / "user.txt").write_text("$history$evidence\n$question\n$language_instruction")
     llm = ScriptedLanguageModel(citing("E1", "Rent is due on the 5th"))
 
     answer = ask(

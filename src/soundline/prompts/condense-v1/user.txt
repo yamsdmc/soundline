@@ -1,0 +1,5 @@
+$history
+
+Latest message: $question
+
+Respond with JSON only: {"query": "<standalone search query>"}

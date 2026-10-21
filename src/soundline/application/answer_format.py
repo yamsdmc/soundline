@@ -37,3 +37,14 @@ ANSWER_SCHEMA: dict[str, object] = {
 }
 
 ANSWER_FORMAT = OutputFormat("grounded_answer", ANSWER_SCHEMA)
+
+# A follow-up rewritten into a standalone search query (RET-071).
+CONDENSE_FORMAT = OutputFormat(
+    "standalone_query",
+    {
+        "type": "object",
+        "properties": {"query": {"type": "string"}},
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+)

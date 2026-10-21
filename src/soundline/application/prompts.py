@@ -5,7 +5,7 @@ version recorded on every answer. A released version is never edited: changing a
 means a new directory, so eval runs stay comparable.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from importlib.resources.abc import Traversable
@@ -13,13 +13,15 @@ from pathlib import Path
 from string import Template
 from typing import Self
 
-from soundline.application.answer_format import ANSWER_FORMAT
+from soundline.application.answer_format import ANSWER_FORMAT, CONDENSE_FORMAT
 from soundline.application.ports import GenerationRequest
 from soundline.domain.chunks import Chunk
+from soundline.domain.conversation import Turn
 from soundline.domain.errors import ConfigurationError
 from soundline.domain.languages import detect_language, language_name
 
-_PLACEHOLDERS = ("evidence", "question", "language_instruction")
+GROUNDED_PLACEHOLDERS = ("history", "evidence", "question", "language_instruction")
+CONDENSE_PLACEHOLDERS = ("history", "question")
 
 
 @dataclass(frozen=True)
@@ -27,21 +29,23 @@ class PromptTemplate:
     version: str
     system: str
     user: Template
-    """`$evidence`, `$question` and `$language_instruction` are rendered by the code."""
+    """Its `$placeholders` are rendered by the code, never written by the user."""
 
     @classmethod
-    def packaged(cls, version: str) -> Self:
-        return cls._load(version, resources.files("soundline") / "prompts" / version)
+    def packaged(cls, version: str, required: Sequence[str] = GROUNDED_PLACEHOLDERS) -> Self:
+        return cls._load(version, resources.files("soundline") / "prompts" / version, required)
 
     @classmethod
-    def from_directory(cls, directory: str | Path) -> Self:
+    def from_directory(
+        cls, directory: str | Path, required: Sequence[str] = GROUNDED_PLACEHOLDERS
+    ) -> Self:
         """A user-supplied template; its directory name is its version."""
-        return cls._load(Path(directory).name, Path(directory))
+        return cls._load(Path(directory).name, Path(directory), required)
 
     @classmethod
-    def _load(cls, version: str, directory: Traversable) -> Self:
+    def _load(cls, version: str, directory: Traversable, required: Sequence[str]) -> Self:
         user = Template(_text(directory, "user.txt"))
-        missing = [name for name in _PLACEHOLDERS if name not in user.get_identifiers()]
+        missing = [name for name in required if name not in user.get_identifiers()]
         if missing:
             raise ConfigurationError(
                 f"prompt {version!r}: user.txt must contain "
@@ -49,16 +53,48 @@ class PromptTemplate:
             )
         return cls(version, _text(directory, "system.txt"), user)
 
-    def render(self, question: str, evidence: Mapping[str, Chunk]) -> GenerationRequest:
-        blocks = "\n".join(
-            f'<evidence id="{evidence_id}" source="{chunk.source}">\n'
-            f"{_escaped(chunk.text)}\n</evidence>"
-            for evidence_id, chunk in evidence.items()
-        )
-        user = self.user.substitute(
-            evidence=blocks, question=question, language_instruction=_language(question)
-        )
-        return GenerationRequest(self.system, user, ANSWER_FORMAT)
+
+def grounded_request(
+    template: PromptTemplate,
+    question: str,
+    evidence: Mapping[str, Chunk],
+    history: Sequence[Turn] = (),
+) -> GenerationRequest:
+    blocks = "\n".join(
+        f'<evidence id="{evidence_id}" source="{chunk.source}">\n'
+        f"{_escaped(chunk.text)}\n</evidence>"
+        for evidence_id, chunk in evidence.items()
+    )
+    context = (
+        f"{_history(history)}\nThe conversation so far helps understand the question."
+        " It is not evidence: never cite it.\n\n"
+        if history
+        else ""
+    )
+    user = template.user.substitute(
+        history=context,
+        evidence=blocks,
+        question=question,
+        language_instruction=_language(question),
+    )
+    return GenerationRequest(template.system, user, ANSWER_FORMAT)
+
+
+def condense_request(
+    template: PromptTemplate, question: str, history: Sequence[Turn]
+) -> GenerationRequest:
+    """Rewrites a follow-up into a standalone search query (RET-071)."""
+    user = template.user.substitute(history=_history(history), question=question)
+    return GenerationRequest(template.system, user, CONDENSE_FORMAT)
+
+
+def _history(turns: Sequence[Turn]) -> str:
+    """Previous questions and answers, text only (GEN-063), escaped like evidence."""
+    rendered = "\n".join(
+        f"<turn>\nUser: {_escaped(turn.question)}\nAssistant: {_escaped(turn.answer)}\n</turn>"
+        for turn in turns
+    )
+    return f"<history>\n{rendered}\n</history>"
 
 
 def _language(question: str) -> str:
@@ -67,7 +103,7 @@ def _language(question: str) -> str:
     target = (
         f"{language_name(code)}, the language of the question"
         if code
-        else ("the language of the question")
+        else "the language of the question"
     )
     return (
         f"Write each claim in {target}, even when the evidence is in another language."
@@ -82,9 +118,15 @@ def _text(directory: Traversable, name: str) -> str:
         raise ConfigurationError(f"prompt template {name} not found in {directory}") from error
 
 
+_TAGS = ("evidence", "history", "turn")
+
+
 def _escaped(text: str) -> str:
-    """Evidence can never open or close an evidence block (SEC-001)."""
-    return text.replace("</evidence", "&lt;/evidence").replace("<evidence", "&lt;evidence")
+    """Untrusted text can never open or close a block of the prompt (SEC-001)."""
+    for tag in _TAGS:
+        text = text.replace(f"</{tag}", f"&lt;/{tag}").replace(f"<{tag}", f"&lt;{tag}")
+    return text
 
 
-DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v2")
+DEFAULT_PROMPT = PromptTemplate.packaged("grounded-v3")
+CONDENSE_PROMPT = PromptTemplate.packaged("condense-v1", CONDENSE_PLACEHOLDERS)

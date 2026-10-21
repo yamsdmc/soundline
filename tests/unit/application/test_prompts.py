@@ -15,13 +15,13 @@ def write_prompt(directory: Path, user: str) -> Path:
 
 @pytest.mark.spec("GEN-014")
 def test_the_packaged_prompt_is_versioned():
-    assert DEFAULT_PROMPT.version == "grounded-v2"
+    assert DEFAULT_PROMPT.version == "grounded-v3"
 
 
 @pytest.mark.spec("GEN-014")
 def test_a_prompt_directory_overrides_the_packaged_one_and_names_its_version(tmp_path: Path):
     directory = write_prompt(
-        tmp_path / "terse-v2", "$evidence\nQ: $question\n$language_instruction\n"
+        tmp_path / "terse-v2", "$history$evidence\nQ: $question\n$language_instruction\n"
     )
 
     prompt = PromptTemplate.from_directory(directory)
@@ -31,9 +31,9 @@ def test_a_prompt_directory_overrides_the_packaged_one_and_names_its_version(tmp
 
 
 @pytest.mark.spec("GEN-014")
-@pytest.mark.parametrize("missing", ["$evidence", "$question", "$language_instruction"])
+@pytest.mark.parametrize("missing", ["$history", "$evidence", "$question", "$language_instruction"])
 def test_a_prompt_without_a_required_placeholder_is_rejected(tmp_path: Path, missing: str):
-    placeholders = ["$evidence", "$question", "$language_instruction"]
+    placeholders = ["$history", "$evidence", "$question", "$language_instruction"]
     user = "\n".join(p for p in placeholders if p != missing)
 
     with pytest.raises(ConfigurationError, match=missing.removeprefix("$")):

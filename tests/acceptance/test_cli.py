@@ -239,7 +239,7 @@ def test_ask_uses_the_prompt_directory_named_by_soundline_prompt(
     prompt = tmp_path / "house-v1"
     prompt.mkdir()
     (prompt / "system.txt").write_text("House rules.")
-    (prompt / "user.txt").write_text("$evidence\n$question\n$language_instruction")
+    (prompt / "user.txt").write_text("$history$evidence\n$question\n$language_instruction")
     scripted = ScriptedLanguageModel({"claims": [], "insufficient_evidence": "unclear"})
     monkeypatch.setenv("SOUNDLINE_LLM", "scripted:test")
     monkeypatch.setenv("SOUNDLINE_PROMPT", str(prompt))

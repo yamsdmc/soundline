@@ -1,6 +1,14 @@
 import pytest
 
-from soundline.domain.answers import Answer, AnswerStatus, Citation, Claim, answer_to_dict, render
+from soundline.domain.answers import (
+    Answer,
+    AnswerStatus,
+    Citation,
+    Claim,
+    answer_to_dict,
+    history_text,
+    render,
+)
 from soundline.domain.quotes import Span
 from soundline.domain.usage import StageUsage, TokenUsage, Usage
 
@@ -38,9 +46,9 @@ def test_a_claim_without_closing_punctuation_ends_with_its_marker():
 
 @pytest.mark.spec("GEN-014")
 def test_the_json_form_of_an_answer_carries_its_prompt_version():
-    answer = Answer(AnswerStatus.ABSTAINED, prompt_version="grounded-v2")
+    answer = Answer(AnswerStatus.ABSTAINED, prompt_version="grounded-v3")
 
-    assert answer_to_dict(answer)["prompt_version"] == "grounded-v2"
+    assert answer_to_dict(answer)["prompt_version"] == "grounded-v3"
 
 
 @pytest.mark.spec("GEN-070")
@@ -61,3 +69,12 @@ def test_the_json_form_of_an_answer_carries_its_usage():
         "tokens": {"input": 7, "output": 2, "cache_read": 0, "cache_write": 0},
         "cost_usd": 0.0,
     }
+
+
+@pytest.mark.spec("GEN-063")
+def test_a_previous_answer_becomes_history_text_without_its_citation_markers():
+    answered = Answer(AnswerStatus.ANSWERED, text="Rent is due on the 5th [1]. Pets [2] are ok.")
+    abstained = Answer(AnswerStatus.ABSTAINED, abstention_message="nothing about parking")
+
+    assert history_text(answered) == "Rent is due on the 5th. Pets are ok."
+    assert history_text(abstained) == "(no answer: nothing about parking)"

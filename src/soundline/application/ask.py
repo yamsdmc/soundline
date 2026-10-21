@@ -2,22 +2,30 @@
 
 import json
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from typing import cast
 
 from soundline.application.ports import GenerationRequest, LanguageModel, Retriever
-from soundline.application.prompts import DEFAULT_PROMPT, PromptTemplate
+from soundline.application.prompts import (
+    CONDENSE_PROMPT,
+    DEFAULT_PROMPT,
+    PromptTemplate,
+    condense_request,
+    grounded_request,
+)
 from soundline.domain.answers import (
     AbstentionReason,
     Answer,
     AnswerStatus,
     Citation,
     Claim,
+    QueryInfo,
     render,
 )
 from soundline.domain.chunks import Chunk
-from soundline.domain.errors import GenerationError
+from soundline.domain.conversation import Turn, pack_history
+from soundline.domain.errors import GenerationError, ProviderUnavailableError
 from soundline.domain.usage import Price, StageUsage, Usage, price_for
 from soundline.domain.verification import Method, verify_quote
 
@@ -47,6 +55,8 @@ class GenerationSettings:
 
     k: int = 5
     prompt: PromptTemplate = DEFAULT_PROMPT  # GEN-014
+    condense_prompt: PromptTemplate = CONDENSE_PROMPT  # RET-071
+    history_budget_tokens: int = 1500  # GEN-062
     prices: Mapping[str, Price] = field(default_factory=dict[str, Price])  # GEN-070
 
 
@@ -55,27 +65,63 @@ def ask(
     retriever: Retriever,
     llm: LanguageModel,
     settings: GenerationSettings | None = None,
+    history: Sequence[Turn] = (),
 ) -> Answer:
+    """`history` holds previous turns, text only: context, never evidence (GEN-060)."""
     settings = settings or GenerationSettings()
-    prompt = settings.prompt
-    hits = retriever.search(question, settings.k)
-    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(hits, 1)}
-    if not evidence:  # GEN-001: no evidence, no model call
-        return Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
-
     calls = _Calls(llm, settings.prices)
-    output = _generate(calls, prompt.render(question, evidence))
-    usage = Usage(tuple(calls.stages))
+    packed = pack_history(history, settings.history_budget_tokens)
+    warnings: list[str] = []
+    search_query = question
+    if packed.turns:
+        search_query = _condensed(question, packed.turns, calls, settings, warnings)
+    hits = retriever.search(search_query, settings.k)
+    evidence = {f"E{rank}": chunk for rank, chunk in enumerate(hits, 1)}
+    query = QueryInfo(question, search_query, len(packed.turns), packed.dropped)
+
+    if not evidence:  # GEN-001: no evidence, no generation call
+        answer = Answer(AnswerStatus.ABSTAINED, abstention_reason=AbstentionReason.NO_EVIDENCE)
+        return replace(answer, query=query, warnings=tuple(warnings), usage=calls.usage())
+    request = grounded_request(settings.prompt, question, evidence, packed.turns)
+    output = _generate(calls, request)
+    return replace(
+        _answer(output, evidence),
+        lenient_parse=output.lenient,
+        prompt_version=settings.prompt.version,
+        usage=calls.usage(),
+        query=query,
+        warnings=tuple(warnings),
+    )
+
+
+def _condensed(
+    question: str,
+    history: Sequence[Turn],
+    calls: "_Calls",
+    settings: GenerationSettings,
+    warnings: list[str],
+) -> str:
+    """The follow-up as a standalone query; the question itself if that fails (RET-073)."""
+    request = condense_request(settings.condense_prompt, question, history)
+    try:
+        data, _ = _json_object(calls.generate("rewrite", request))
+        query = data.get("query")
+        if isinstance(query, str) and query.strip():
+            return query.strip()
+        reason = "no query in the output"
+    except (_InvalidOutputError, GenerationError, ProviderUnavailableError) as error:
+        reason = str(error)
+    warnings.append(f"follow-up condensation failed ({reason}); searched the question as asked")
+    return question
+
+
+def _answer(output: "_ModelOutput", evidence: Mapping[str, Chunk]) -> Answer:
     if output.insufficient_evidence is not None:  # GEN-021
         return Answer(
             AnswerStatus.ABSTAINED,
             abstention_reason=AbstentionReason.MODEL_INSUFFICIENT_EVIDENCE,
             abstention_message=output.insufficient_evidence,
-            lenient_parse=output.lenient,
-            prompt_version=prompt.version,
-            usage=usage,
         )
-
     verified = [_verified(claim, evidence) for claim in output.claims]
     supported = [claim for claim in verified if claim.citations]
     dropped = [claim.text for claim in verified if not claim.citations]  # GEN-033
@@ -84,21 +130,10 @@ def ask(
             AnswerStatus.ABSTAINED,
             abstention_reason=AbstentionReason.UNSUPPORTED_CLAIMS,
             dropped_claims=dropped,
-            lenient_parse=output.lenient,
-            prompt_version=prompt.version,
-            usage=usage,
         )
     text, citations = render(supported)
     status = AnswerStatus.PARTIAL if dropped else AnswerStatus.ANSWERED  # GEN-034
-    return Answer(
-        status,
-        text=text,
-        citations=citations,
-        dropped_claims=dropped,
-        lenient_parse=output.lenient,
-        prompt_version=prompt.version,
-        usage=usage,
-    )
+    return Answer(status, text=text, citations=citations, dropped_claims=dropped)
 
 
 class _Calls:
@@ -116,6 +151,9 @@ class _Calls:
         cost = price.cost(generation.usage) if price else None
         self.stages.append(StageUsage(stage, model, generation.usage, cost))
         return generation.text
+
+    def usage(self) -> Usage:
+        return Usage(tuple(self.stages))
 
 
 def _generate(calls: _Calls, request: GenerationRequest) -> _ModelOutput:
@@ -137,8 +175,9 @@ def _generate(calls: _Calls, request: GenerationRequest) -> _ModelOutput:
             ) from second
 
 
-def _parse(raw: str) -> _ModelOutput:
-    """Strict JSON first; then lenient: JSON in a Markdown fence or amid prose (GEN-023)."""
+def _json_object(raw: str) -> tuple[Mapping[str, object], bool]:
+    """Strict JSON first; then lenient: JSON in a Markdown fence or amid prose (GEN-023).
+    The flag says whether leniency was needed."""
     lenient = False
     try:
         data = json.loads(raw)
@@ -147,7 +186,11 @@ def _parse(raw: str) -> _ModelOutput:
         data = _lenient_json(raw)
     if not isinstance(data, Mapping):
         raise _InvalidOutputError("the output must be a JSON object")
-    output = cast("Mapping[str, object]", data)
+    return cast("Mapping[str, object]", data), lenient
+
+
+def _parse(raw: str) -> _ModelOutput:
+    output, lenient = _json_object(raw)
     claims = output.get("claims")
     # Claims win over the declaration: small models often fill it with "" while answering,
     # and the claims are verified anyway (GEN-021, GEN-023).

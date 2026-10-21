@@ -15,8 +15,9 @@ from soundline.application.ingest import IngestionReport, IngestionStatus, Inges
 from soundline.application.ingest_sources import ingest_sources
 from soundline.application.pipeline import check_pipeline, pipeline_manifest
 from soundline.application.ports import Embedder, Index, LanguageModel, RunStore, SourceReader
-from soundline.domain.answers import Answer
+from soundline.domain.answers import Answer, history_text
 from soundline.domain.chunking import ChunkingSettings
+from soundline.domain.conversation import Turn
 from soundline.domain.datasets import DatasetError
 from soundline.domain.errors import ConfigurationError
 from soundline.domain.filters import Filter, Metadata, parse_filter
@@ -171,13 +172,18 @@ class Soundline:
         check_pipeline(self._index.manifest, self._manifest)  # STO-012
         return self._retriever.search_result(query, k, condition)
 
-    def ask(self, question: str) -> Answer:
+    def conversation(self) -> "Conversation":
+        """Follow-up questions with the previous turns as context (GEN-061)."""
+        return Conversation(self)
+
+    def ask(self, question: str, history: Sequence[Turn] = ()) -> Answer:
+        """`history`: previous turns, text only; context for the model, never evidence."""
         if self._llm is None:
             raise ConfigurationError(  # CLI-004
                 "asking needs a language model: set SOUNDLINE_LLM (e.g."
                 " anthropic:claude-sonnet-5-5), or use search, which needs none"
             )
-        return ask(question, self._retriever, self._llm, self._generation)
+        return ask(question, self._retriever, self._llm, self._generation, history)
 
     def evaluate(
         self,
@@ -214,6 +220,19 @@ class Soundline:
 
 
 DEFAULT_EMBEDDER = "fastembed:intfloat/multilingual-e5-large"  # CFG-023
+
+
+class Conversation:
+    """Keeps the turns of one conversation in memory (GEN-061). Not thread-safe."""
+
+    def __init__(self, soundline: Soundline) -> None:
+        self._soundline = soundline
+        self.turns: list[Turn] = []
+
+    def ask(self, question: str) -> Answer:
+        answer = self._soundline.ask(question, self.turns)
+        self.turns.append(Turn(question, history_text(answer)))
+        return answer
 
 
 def embedder_from_spec(spec: str) -> Embedder:
