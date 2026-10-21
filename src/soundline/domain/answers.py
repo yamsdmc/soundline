@@ -61,6 +61,10 @@ class Answer:
     abstention_message: str | None = None
     dropped_claims: list[str] = field(default_factory=list[str])
     """Claims removed because none of their citations could be verified (GEN-033)."""
+    claims: tuple[Claim, ...] = ()
+    """The supported claims, each with its verified citations only."""
+    citations_proposed: int = 0
+    """Citations the model wrote, before verification (`citation_validity`, EVL-020)."""
     lenient_parse: bool = False
     """The model's output needed the lenient parser (GEN-023)."""
     prompt_version: str | None = None
@@ -102,16 +106,12 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
     return {
         "status": answer.status.value,
         "text": answer.text,
-        "citations": [
-            {
-                "source": c.source,
-                "quote": c.quote,
-                "span": [c.span.start, c.span.end],
-                "section_path": list(c.section_path),
-                "approximate": c.approximate,
-            }
-            for c in answer.citations
+        "citations": [_citation_to_dict(c) for c in answer.citations],
+        "claims": [
+            {"text": claim.text, "citations": [_citation_to_dict(c) for c in claim.citations]}
+            for claim in answer.claims
         ],
+        "citations_proposed": answer.citations_proposed,
         "dropped_claims": answer.dropped_claims,
         "abstention_reason": answer.abstention_reason.value if answer.abstention_reason else None,
         "abstention_message": answer.abstention_message,
@@ -131,4 +131,14 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
             "tokens": asdict(answer.usage.tokens),
             "cost_usd": answer.usage.cost_usd,
         },
+    }
+
+
+def _citation_to_dict(citation: Citation) -> dict[str, object]:
+    return {
+        "source": citation.source,
+        "quote": citation.quote,
+        "span": [citation.span.start, citation.span.end],
+        "section_path": list(citation.section_path),
+        "approximate": citation.approximate,
     }

@@ -299,3 +299,23 @@ def test_no_model_call_costs_nothing():
     answer = ask("When is rent due?", InMemoryIndex(), ScriptedLanguageModel())
 
     assert answer.usage.cost_usd == 0.0
+
+
+@pytest.mark.spec("EVL-020")
+def test_the_answer_keeps_its_supported_claims_and_counts_the_citations_proposed():
+    llm = ScriptedLanguageModel(
+        {
+            "claims": [
+                claim(
+                    "Rent is due on the 5th.", "Rent is due on the 5th", "Rent is due on the 6th"
+                ),
+                claim("Parking is free.", "Parking is free"),
+            ]
+        }
+    )
+
+    answer = ask("When is rent due?", index_with_lease(), llm)
+
+    assert [c.text for c in answer.claims] == ["Rent is due on the 5th."]
+    assert [len(c.citations) for c in answer.claims] == [1]
+    assert answer.citations_proposed == 3

@@ -125,7 +125,12 @@ def ask_stream(
                     yield ClaimVerified(claim)
         answer = _answer(output, verified)
         yield completed(
-            replace(answer, lenient_parse=output.lenient, prompt_version=settings.prompt.version)
+            replace(
+                answer,
+                lenient_parse=output.lenient,
+                prompt_version=settings.prompt.version,
+                citations_proposed=sum(len(claim.citations) for claim in output.claims),
+            )
         )
     except SoundlineError as error:
         yield StreamError(error)
@@ -169,7 +174,9 @@ def _answer(output: "_ModelOutput", verified: Sequence[Claim]) -> Answer:
         )
     text, citations = render(supported)
     status = AnswerStatus.PARTIAL if dropped else AnswerStatus.ANSWERED  # GEN-034
-    return Answer(status, text=text, citations=citations, dropped_claims=dropped)
+    return Answer(
+        status, text=text, citations=citations, dropped_claims=dropped, claims=tuple(supported)
+    )
 
 
 class _Calls:

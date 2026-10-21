@@ -78,3 +78,30 @@ def test_a_previous_answer_becomes_history_text_without_its_citation_markers():
 
     assert history_text(answered) == "Rent is due on the 5th. Pets are ok."
     assert history_text(abstained) == "(no answer: nothing about parking)"
+
+
+@pytest.mark.spec("EVL-020")
+def test_the_json_form_lists_claims_with_their_citations_and_the_proposed_count():
+    answer = Answer(
+        AnswerStatus.ANSWERED,
+        claims=(Claim("Rent is due on the 5th.", (RENT,)),),
+        citations_proposed=2,
+    )
+
+    data = answer_to_dict(answer)
+
+    assert data["claims"] == [
+        {
+            "text": "Rent is due on the 5th.",
+            "citations": [
+                {
+                    "source": "lease.md",
+                    "quote": "Rent is due on the 5th",
+                    "span": [0, 22],
+                    "section_path": [],
+                    "approximate": False,
+                }
+            ],
+        }
+    ]
+    assert data["citations_proposed"] == 2
