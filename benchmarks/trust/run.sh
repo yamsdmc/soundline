@@ -4,8 +4,8 @@
 #
 #   make bench-trust                       # qwen3.5:9b generates and judges
 #   MODEL=qwen3.5:9b JUDGE=anthropic:claude-opus-5-5 make bench-trust
-#   JUDGE=ollama:gemma3:12b OUTPUT=benchmarks/trust/results-gemma-judge.md \
-#     SOUNDLINE_HOME=.soundline-bench-gemma make bench-trust   # a judge of another family
+#   OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=... \
+#     JUDGE=openai:anthropic/claude-sonnet-5.5 make bench-trust   # a calibrated judge
 #
 # SOUNDLINE_HOME is kept between runs: model calls are cached (EVL-061), so a rerun is free
 # and reproduces the same numbers. Delete it, or set FRESH=1, to call the models again.

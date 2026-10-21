@@ -1,6 +1,6 @@
 # Trust benchmark results
 
-Generated 2026-10-21 on arm64 (Darwin), model `ollama:qwen3.5:9b`, judge {"calibration": "uncalibrated", "model": "ollama:qwen3.5:9b", "version": "faithfulness-v2"}, dataset `evals/trust-fr/dataset.jsonl` (47 cases, sha256 `88532805a4a4`).
+Generated 2026-10-21 on arm64 (Darwin), model `ollama:qwen3.5:9b`, judge {"calibration": "calibrated: kappa 0.74, accuracy 0.87 on 54 labels", "correctness_version": "correctness-v1", "model": "openai:anthropic/claude-sonnet-5.5", "version": "faithfulness-v3"}, dataset `evals/trust-fr/dataset.jsonl` (47 cases, sha256 `a242e6756ed9`).
 
 | Metric | Naive RAG (LangChain) | Soundline, verification off | Soundline |
 |---|---|---|---|
@@ -8,7 +8,8 @@ Generated 2026-10-21 on arm64 (Darwin), model `ollama:qwen3.5:9b`, judge {"calib
 | `injection_success_rate` | 0.67 [0.33, 1.00] n=6 | 0.67 [0.33, 1.00] n=6 | 0.67 [0.33, 1.00] n=6 |
 | `unflagged_injection_rate` | 0.67 [0.33, 1.00] n=6 | 0.33 [0.00, 0.67] n=6 | 0.33 [0.00, 0.67] n=6 |
 | `answer_rate` | 0.97 [0.90, 1.00] n=29 | 0.97 [0.90, 1.00] n=29 | 0.97 [0.90, 1.00] n=29 |
-| `faithfulness` | 0.74 [0.62, 0.85] n=39 | 0.86 [0.76, 0.95] n=31 | 0.86 [0.76, 0.95] n=31 |
+| `faithfulness` | 0.71 [0.59, 0.82] n=39 | 0.69 [0.54, 0.82] n=31 | 0.69 [0.54, 0.82] n=31 |
+| `correctness` | 0.89 [0.80, 0.98] n=28 | 0.88 [0.77, 0.96] n=28 | 0.84 [0.71, 0.95] n=28 |
 | `shown_citation_validity` | n/a | 0.99 [0.98, 1.00] n=31 | 1.00 [1.00, 1.00] n=31 |
 | `shown_support_rate` | n/a | 1.00 [0.99, 1.00] n=31 | 1.00 [1.00, 1.00] n=31 |
 | `citation_validity` | n/a | 0.99 [0.98, 1.00] n=31 | 0.99 [0.98, 1.00] n=31 |
@@ -18,7 +19,7 @@ Generated 2026-10-21 on arm64 (Darwin), model `ollama:qwen3.5:9b`, judge {"calib
 
 | Per question (p50 / p95) | Naive RAG (LangChain) | Soundline, verification off | Soundline |
 |---|---|---|---|
-| `latency_ms` | 5,856 / 8,136 | 11,083 / 22,161 | 11,084 / 22,162 |
+| `latency_ms` | 5,856 / 8,136 | 11,082 / 22,165 | 11,085 / 22,162 |
 | `tokens_in` | 1,291 / 1,562 | 2,469 / 3,101 | 2,469 / 3,101 |
 | `tokens_out` | 60 / 136 | 177 / 872 | 177 / 872 |
 
@@ -34,17 +35,18 @@ Comparison of `soundline-verified` against `soundline-unverified` (47 cases, 95%
 | citation_recall | 0.862 | 0.862 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | citation_validity | 0.991 | 0.991 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | conflict_rate | 0.129 | 0.129 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
+| correctness | 0.875 | 0.839 | -0.036 [-0.107, +0.000] | no significant change ⚠️ too few cases |
 | cost_usd | 0.000 | 0.000 | +0.000 [+0.000, +0.000] | no significant change |
-| faithfulness | 0.863 | 0.862 | -0.002 [-0.005, +0.000] | no significant change ⚠️ too few cases |
+| faithfulness | 0.685 | 0.686 | +0.001 [+0.000, +0.002] | no significant change ⚠️ too few cases |
 | false_answer_rate | 0.167 | 0.167 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | hit_rate@1 | 0.586 | 0.586 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | hit_rate@3 | 0.828 | 0.828 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | hit_rate@5 | 0.931 | 0.931 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | hit_rate@10 | 0.966 | 0.966 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | injection_success_rate | 0.667 | 0.667 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
-| judge_tokens_in | 729.298 | 718.681 | -10.617 [-30.064, +0.000] | no significant change ⚠️ too few cases |
-| judge_tokens_out | 103.426 | 101.787 | -1.638 [-4.766, +0.000] | no significant change ⚠️ too few cases |
-| latency_ms | 14799.825 | 14800.401 | +0.575 [+0.265, +0.849] | regressed ⚠️ too few cases |
+| judge_tokens_in | 2202.894 | 2177.979 | -24.915 [-72.064, +0.000] | no significant change ⚠️ too few cases |
+| judge_tokens_out | 330.277 | 326.617 | -3.660 [-10.745, +0.000] | no significant change ⚠️ too few cases |
+| latency_ms | 14816.285 | 14802.167 | -14.118 [-32.221, -1.695] | improved ⚠️ too few cases |
 | lenient_parse_rate | 0.000 | 0.000 | +0.000 [+0.000, +0.000] | no significant change |
 | mrr | 0.708 | 0.708 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
 | ndcg@1 | 0.586 | 0.586 | +0.000 [+0.000, +0.000] | no significant change ⚠️ too few cases |
@@ -73,12 +75,13 @@ Comparison of `soundline-verified` against `naive-langchain` (47 cases, 95% boot
 | abstention_precision | 0.875 | 0.938 | +0.000 [+0.000, +0.000] | no significant change |
 | answer_rate | 0.966 | 0.966 | +0.000 [-0.103, +0.103] | no significant change ⚠️ too few cases |
 | conflict_rate | 0.000 | 0.129 | +0.133 [+0.033, +0.267] | improved |
-| faithfulness | 0.739 | 0.862 | +0.024 [-0.128, +0.171] | no significant change ⚠️ too few cases |
+| correctness | 0.893 | 0.839 | -0.093 [-0.222, +0.019] | no significant change ⚠️ too few cases |
+| faithfulness | 0.709 | 0.686 | -0.163 [-0.290, -0.047] | regressed ⚠️ too few cases |
 | false_answer_rate | 0.611 | 0.167 | -0.444 [-0.667, -0.222] | improved ⚠️ too few cases |
 | injection_success_rate | 0.667 | 0.667 | +0.000 [-0.500, +0.500] | no significant change ⚠️ too few cases |
-| judge_tokens_in | 1158.149 | 718.681 | -439.468 [-695.638, -194.979] | improved ⚠️ too few cases |
-| judge_tokens_out | 83.979 | 101.787 | +17.809 [-8.043, +45.298] | no significant change ⚠️ too few cases |
-| latency_ms | 5958.408 | 14800.401 | +8841.993 [+5718.980, +13622.729] | regressed ⚠️ too few cases |
+| judge_tokens_in | 2784.638 | 2177.979 | -606.660 [-1142.298, -87.872] | improved ⚠️ too few cases |
+| judge_tokens_out | 244.277 | 326.617 | +82.340 [-5.021, +180.362] | no significant change ⚠️ too few cases |
+| latency_ms | 5958.408 | 14802.167 | +8843.760 [+5720.783, +13623.033] | regressed ⚠️ too few cases |
 | tokens_in | 1302.213 | 2421.234 | +1119.021 [+1016.702, +1231.149] | regressed ⚠️ too few cases |
 | tokens_out | 66.532 | 354.617 | +288.085 [+144.128, +507.532] | regressed ⚠️ too few cases |
 | unflagged_injection_rate | 0.667 | 0.333 | -0.333 [-0.667, +0.000] | no significant change ⚠️ too few cases |
