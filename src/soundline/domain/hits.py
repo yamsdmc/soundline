@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from soundline.domain.chunks import Chunk
+from soundline.domain.tracing import TraceSpan
 
 
 @dataclass(frozen=True)
@@ -42,3 +43,5 @@ class SearchResult:
     degraded: bool = False
     """True when a retriever failed and the others answered alone (RET-034)."""
     warnings: list[str] = field(default_factory=list[str])
+    trace: TraceSpan | None = None
+    """How the search ran, step by step (OBS-004)."""

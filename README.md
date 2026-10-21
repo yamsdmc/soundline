@@ -2,6 +2,8 @@
 
 > **The eval-first RAG engine. Every answer cited. Every change measured.**
 
+**The model proposes, the code verifies.** A language model is good at reading and phrasing; it is not a source of truth. In Soundline it proposes claims with quotes, and deterministic code checks every quote against the source before anything reaches the user.
+
 Before sailing into unknown waters, sailors dropped a *sounding line*: a weighted rope marked at regular intervals, to measure depth before committing to a course. Soundline does the same for retrieval-augmented generation: it goes deep into your documents, and it **measures** everything it does.
 
 > **Status: specification phase.** No code yet. The specification in [`docs/spec`](docs/spec/README.md) is the source of truth, and the implementation will be driven test-first from it. Examples below show the **intended** interface. Every number on this page is illustrative until the first benchmark is published.

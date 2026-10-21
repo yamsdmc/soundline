@@ -30,6 +30,7 @@ from soundline.domain.runs import (
     gate,
     parse_rules,
 )
+from soundline.domain.tracing import render_tree
 
 # Exit codes (CLI-001)
 USAGE_ERROR = 2
@@ -112,6 +113,7 @@ def search(
         typer.Option("--filter", help='Canonical JSON filter, e.g. {"eq": ["type", "x"]}.'),
     ] = None,
     as_json: JsonOption = False,
+    explain: Annotated[bool, typer.Option(help="Show each step and its duration.")] = False,
 ) -> None:
     try:
         filters = json.loads(filter_json) if filter_json else None
@@ -130,6 +132,9 @@ def search(
         ranks = ", ".join(f"{name} {r or '-'}" for name, r in hit.ranks.items())
         typer.echo(f"{rank}. {hit.source}  [{where}]  score {hit.score:.4f} ({ranks})")
         typer.echo(f"   {hit.text[:200]}")
+    if explain and result.trace is not None:
+        typer.echo()
+        typer.echo(render_tree(result.trace))
 
 
 @app.command(help="Create the Soundline home directory.")

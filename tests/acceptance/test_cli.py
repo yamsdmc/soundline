@@ -208,3 +208,22 @@ def test_ask_prints_the_answer_its_citations_and_what_was_dropped(
     assert '[1] lease.md, Lease > Payment: "Rent is due on the 5th"' in result.stdout
     assert "partial" in result.stdout
     assert "Parking is free." in result.stdout
+
+
+@pytest.mark.spec("OBS-004")
+def test_search_explain_shows_each_step_with_its_duration(run: Run, docs: Path):
+    run("ingest", str(docs))
+
+    result = run("search", "rent", "--explain")
+
+    assert result.exit_code == 0
+    lines = result.stdout.splitlines()
+    tree = lines[lines.index(next(line for line in lines if line.startswith("soundline.search ["))) :]
+    assert [line.split(" [")[0] for line in tree[:5]] == [
+        "soundline.search",
+        "├─ embed query",
+        "├─ lexical",
+        "├─ dense",
+        "└─ fuse",
+    ]
+    assert "hits=" in tree[2]

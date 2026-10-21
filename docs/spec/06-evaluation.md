@@ -142,6 +142,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
   4. Soundline with native provider citations and verification (where available).
 
   It reports `false_answer_rate`, `faithfulness`, `citation_validity`, `correctness`, latency and cost, with CIs, as one table and chart in the README. It runs with one command (`make bench-trust`) and also as a notebook. Its purpose is to **measure** the effect of verification, whatever the result. If verification does not help on some metric, the README says so.
+- **EVL-093** **The abstention trade-off curve.** With a calibrated relevance signal (a reranker score, GEN-002), the trust benchmark also sweeps the abstention threshold and plots, for each value, the false-answer rate against the rate of answerable questions still answered. There is no universally good threshold: the curve lets each user pick one for their own cost of a wrong answer, which differs between, say, rent questions and medical ones.
 
 ## Invariants
 

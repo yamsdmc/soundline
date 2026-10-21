@@ -144,6 +144,7 @@ Scope 0.1: stdio transport with `search`, `ask` and `list_corpora`. Scope later:
 Resources: each document is exposed as a resource (`soundline://<corpus>/<document_id>`), readable by span.
 
 - **MCP-001** Tool descriptions MUST explain when to use `search` (the agent reasons over passages itself) versus `ask` (delegated grounded answer).
+  > Guidance: an agent following a ReAct loop (reason, act, observe) pays for every observation in its own context. `search` returns passages for the agent to reason over and suits multi-step investigations; `ask` delegates the whole retrieve-and-verify cycle and returns one compact, verified answer, which keeps the agent's scratchpad small.
 - **MCP-002** Tool results MUST present document text as quoted data with source labels, consistent with GEN-010, so that agents treat it as untrusted content.
 - **MCP-003** The MCP server is read-only by default. Ingestion tools MAY be enabled explicitly.
 - **MCP-004** Corpus descriptions (set with `soundline corpus describe`) are surfaced to agents to help tool selection.
