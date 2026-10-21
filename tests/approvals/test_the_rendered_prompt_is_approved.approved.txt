@@ -6,6 +6,7 @@ A quote comes from a single evidence item; when support spans two items, cite ea
 An evidence item's section is part of its meaning: keep the conditions that the quote or its section give (which situation, which kind of lease, which case), and never use a quote for a case its section does not cover.
 Do not write framing sentences: every sentence is a claim and needs a citation.
 If the evidence does not answer the question, say so instead of answering.
+When evidence items disagree on what the question asks, do not choose between them: state each version as its own claim, saying which source says it, and report the disagreement in "conflicts".
 === prompt ===
 <evidence id="E1" source="lease.md">
 Rent is due on the 5th. Pets are allowed.
@@ -19,5 +20,6 @@ Question: When is rent due?
 Write each claim in English, the language of the question, even when the evidence is in another language. Quotes stay verbatim, in the language of the evidence.
 
 Respond with JSON only, in one of these two forms:
-{"claims": [{"text": "<one sentence>", "citations": [{"evidence_id": "E1", "quote": "<verbatim>"}]}], "insufficient_evidence": null}
-{"claims": [], "insufficient_evidence": "<why the evidence does not answer>"}
+{"claims": [{"text": "<one sentence>", "citations": [{"evidence_id": "E1", "quote": "<verbatim>"}]}], "insufficient_evidence": null, "conflicts": []}
+{"claims": [], "insufficient_evidence": "<why the evidence does not answer>", "conflicts": []}
+When evidence items disagree, list each disagreement in "conflicts": {"about": "<what they disagree on>", "evidence_ids": ["E1", "E2"]}.

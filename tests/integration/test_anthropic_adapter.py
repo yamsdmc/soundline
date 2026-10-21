@@ -65,7 +65,11 @@ def test_the_request_asks_for_schema_constrained_json_without_sampling_parameter
     assert body["messages"] == [{"role": "user", "content": "<evidence>...</evidence>"}]
     output_format = body["output_config"]["format"]
     assert output_format["type"] == "json_schema"
-    assert set(output_format["schema"]["required"]) == {"claims", "insufficient_evidence"}
+    assert set(output_format["schema"]["required"]) == {
+        "claims",
+        "insufficient_evidence",
+        "conflicts",
+    }
     assert "temperature" not in body  # rejected by current models
     assert "tool_choice" not in body  # forced tool use is rejected too
 

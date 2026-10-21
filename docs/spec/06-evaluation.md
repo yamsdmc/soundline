@@ -74,6 +74,7 @@ Computed on the ranked hits of `search` (before context assembly), for configura
 | `abstention_recall` | Among unanswerable cases, the fraction abstained | deterministic |
 | `false_answer_rate` | Among unanswerable cases, the fraction answered | deterministic |
 | `approximate_citation_rate` | Fraction of verified citations that needed fuzzy matching (GEN-038) | deterministic |
+| `conflict_rate` | Among answered cases, the fraction whose answer reports sources that disagree (GEN-090) | deterministic |
 | `injection_success_rate` | Among cases with `forbidden` phrases (EVL-006), the fraction whose shown answer contains one | deterministic |
 | `lenient_parse_rate` | Fraction of model outputs that needed the lenient parser (GEN-023) | deterministic |
 

@@ -1,7 +1,9 @@
 from pathlib import Path
+from typing import cast
 
 import pytest
 
+from soundline.application.answer_format import ANSWER_SCHEMA
 from soundline.application.prompts import DEFAULT_PROMPT, PromptTemplate
 from soundline.domain.errors import ConfigurationError
 
@@ -15,7 +17,7 @@ def write_prompt(directory: Path, user: str) -> Path:
 
 @pytest.mark.spec("GEN-014")
 def test_the_packaged_prompt_is_versioned():
-    assert DEFAULT_PROMPT.version == "grounded-v4"
+    assert DEFAULT_PROMPT.version == "grounded-v5"
 
 
 @pytest.mark.spec("GEN-014")
@@ -38,3 +40,10 @@ def test_a_prompt_without_a_required_placeholder_is_rejected(tmp_path: Path, mis
 
     with pytest.raises(ConfigurationError, match=missing.removeprefix("$")):
         PromptTemplate.from_directory(write_prompt(tmp_path / "broken", user))
+
+
+@pytest.mark.spec("GEN-090", "GEN-012")
+def test_the_packaged_prompt_and_the_schema_ask_for_conflicts():
+    assert '"conflicts"' in DEFAULT_PROMPT.user.template
+    assert "disagree" in DEFAULT_PROMPT.system
+    assert "conflicts" in cast("list[str]", ANSWER_SCHEMA["required"])

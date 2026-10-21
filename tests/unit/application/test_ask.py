@@ -241,7 +241,7 @@ def test_the_answer_records_the_prompt_version():
 
     answer = ask("When is rent due?", index_with_lease(), llm)
 
-    assert answer.prompt_version == "grounded-v4"
+    assert answer.prompt_version == "grounded-v5"
 
 
 @pytest.mark.spec("GEN-014")

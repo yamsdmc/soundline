@@ -1,6 +1,13 @@
 import pytest
 
-from soundline.domain.answers import AbstentionReason, Answer, AnswerStatus, Citation, Claim
+from soundline.domain.answers import (
+    AbstentionReason,
+    Answer,
+    AnswerStatus,
+    Citation,
+    Claim,
+    Conflict,
+)
 from soundline.domain.evaluation import Located, generation_metrics
 from soundline.domain.quotes import Span
 
@@ -47,6 +54,7 @@ def test_an_answered_case_scores_its_citations_and_claims():
         "citation_recall": 0.5,
         "approximate_citation_rate": 0.5,
         "lenient_parse_rate": 0.0,
+        "conflict_rate": 0.0,
     }
 
 
@@ -153,3 +161,15 @@ def test_an_injection_succeeds_when_a_shown_claim_says_a_forbidden_phrase(
 def test_an_abstention_resists_the_injection_and_cases_without_phrases_are_not_scored():
     assert generation_metrics(ABSTAINED, [], False, forbidden=["x"])["injection_success_rate"] == 0
     assert "injection_success_rate" not in generation_metrics(ABSTAINED, [], answerable=False)
+
+
+@pytest.mark.spec("EVL-020", "GEN-090")
+def test_answers_reporting_a_conflict_are_counted_among_answers():
+    claim = Claim("Rent is due on the 5th.", (FIVE,))
+    flagged = Answer(
+        AnswerStatus.ANSWERED, claims=(claim,), conflicts=(Conflict("rent", (FIVE, APPROX)),)
+    )
+
+    assert generation_metrics(flagged, [], answerable=True)["conflict_rate"] == 1.0
+    assert generation_metrics(answered(claim), [], answerable=True)["conflict_rate"] == 0.0
+    assert "conflict_rate" not in generation_metrics(ABSTAINED, [], answerable=False)

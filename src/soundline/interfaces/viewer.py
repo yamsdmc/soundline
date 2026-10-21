@@ -7,6 +7,7 @@ from collections.abc import Callable
 from html import escape
 
 from soundline.domain.answers import Answer, AnswerStatus, Citation
+from soundline.interfaces.answer_text import conflict_lines
 
 _CONTEXT_CHARS = 280
 
@@ -35,6 +36,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: 
 mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .badge { font-size: .75rem; color: var(--warn); border: 1px solid currentColor;
   border-radius: 999px; padding: 0 6px; margin-left: 6px; }
+.conflict { color: var(--warn); border-left: 3px solid currentColor; padding-left: 10px; }
 .removed li { color: var(--muted); text-decoration: line-through; }
 """
 
@@ -74,6 +76,7 @@ def render_viewer(question: str, answer: Answer, document_text: Callable[[str], 
                 f'{escape(claim.text)} <span class="refs">{markers}</span></span>'
             )
         left.append(f"<p>{' '.join(sentences)}</p>")
+        left += [f'<p class="conflict">{escape(line)}</p>' for line in conflict_lines(answer)]
     if answer.dropped_claims:
         items = "".join(f"<li>{escape(text)}</li>" for text in answer.dropped_claims)
         left.append(

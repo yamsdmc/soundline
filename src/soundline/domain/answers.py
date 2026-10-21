@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 
+from soundline.domain.chunks import Chunk
 from soundline.domain.quotes import Span
 from soundline.domain.usage import Usage
 
@@ -46,6 +47,38 @@ class Claim:
 
 
 @dataclass(frozen=True)
+class Conflict:
+    """Documents that disagree on what the question asks (GEN-090)."""
+
+    about: str
+    citations: tuple[Citation, ...]
+    """The shown citations of the disagreeing evidence, from at least two documents."""
+
+
+def conflict_among(
+    about: str, evidence: Sequence[Chunk], claims: Sequence[Claim]
+) -> Conflict | None:
+    """The conflict the model reported between `evidence` items, if the shown claims cite them
+    from at least two documents (GEN-091)."""
+    cited: list[Citation] = []
+    for claim in claims:
+        for citation in claim.citations:
+            if citation not in cited and any(_within(citation, item) for item in evidence):
+                cited.append(citation)
+    if len({citation.source for citation in cited}) < 2:
+        return None
+    return Conflict(about, tuple(cited))
+
+
+def _within(citation: Citation, item: Chunk) -> bool:
+    return (
+        citation.source == item.source
+        and item.span.start <= citation.span.start
+        and citation.span.end <= item.span.end
+    )
+
+
+@dataclass(frozen=True)
 class QueryInfo:
     question: str
     search_query: str
@@ -77,6 +110,8 @@ class Answer:
     query: QueryInfo | None = None
     warnings: tuple[str, ...] = ()
     """Degradations that did not prevent an answer, e.g. a failed condensation (RET-073)."""
+    conflicts: tuple[Conflict, ...] = ()
+    """Documents that disagree, shown with the answer (GEN-090 to GEN-092)."""
 
 
 def render(claims: Sequence[Claim]) -> tuple[str, list[Citation]]:
@@ -119,6 +154,13 @@ def answer_to_dict(answer: Answer) -> dict[str, object]:
         ],
         "citations_proposed": answer.citations_proposed,
         "dropped_claims": answer.dropped_claims,
+        "conflicts": [
+            {
+                "about": conflict.about,
+                "citations": [answer.citations.index(c) + 1 for c in conflict.citations],
+            }
+            for conflict in answer.conflicts
+        ],
         "abstention_reason": answer.abstention_reason.value if answer.abstention_reason else None,
         "abstention_message": answer.abstention_message,
         "prompt_version": answer.prompt_version,

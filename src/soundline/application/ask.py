@@ -20,7 +20,9 @@ from soundline.domain.answers import (
     AnswerStatus,
     Citation,
     Claim,
+    Conflict,
     QueryInfo,
+    conflict_among,
     render,
 )
 from soundline.domain.chunks import Chunk
@@ -48,6 +50,8 @@ class _ModelOutput:
     claims: list[_ModelClaim]
     insufficient_evidence: str | None
     lenient: bool
+    conflicts: list[tuple[str, list[str]]] = field(default_factory=list[tuple[str, list[str]]])
+    """(about, evidence IDs) as the model reported them (GEN-090)."""
 
 
 @dataclass(frozen=True)
@@ -123,6 +127,7 @@ def ask_stream(
         yield completed(
             replace(
                 answer,
+                conflicts=_conflicts(output, evidence, answer.claims),
                 lenient_parse=output.lenient,
                 prompt_version=settings.prompt.version,
                 citations_proposed=sum(len(claim.citations) for claim in output.claims),
@@ -238,7 +243,39 @@ def _parse(raw: str) -> _ModelOutput:
         return _ModelOutput([], str(output["insufficient_evidence"]), lenient)
     if not isinstance(claims, list):
         raise InvalidOutputError("'claims' must be a list of claims")
-    return _ModelOutput([_claim(c) for c in cast("list[object]", claims)], None, lenient)
+    return _ModelOutput(
+        [_claim(c) for c in cast("list[object]", claims)],
+        None,
+        lenient,
+        _reported_conflicts(output.get("conflicts")),
+    )
+
+
+def _reported_conflicts(value: object) -> list[tuple[str, list[str]]]:
+    """Malformed entries are ignored: a conflict is a warning, never a reason to reject an
+    answer (GEN-093)."""
+    reported: list[tuple[str, list[str]]] = []
+    for item in cast("list[object]", value) if isinstance(value, list) else []:
+        entry: Mapping[str, object] = (
+            cast("Mapping[str, object]", item) if isinstance(item, Mapping) else {}
+        )
+        about, ids = entry.get("about"), entry.get("evidence_ids")
+        if isinstance(about, str) and isinstance(ids, list):
+            reported.append((about, [str(i) for i in cast("list[object]", ids)]))
+    return reported
+
+
+def _conflicts(
+    output: _ModelOutput, evidence: Mapping[str, Chunk], claims: Sequence[Claim]
+) -> tuple[Conflict, ...]:
+    """Kept only between documents the shown claims cite (GEN-091)."""
+    kept: list[Conflict] = []
+    for about, ids in output.conflicts:
+        items = [evidence[i] for i in dict.fromkeys(ids) if i in evidence]
+        conflict = conflict_among(about, items, claims)
+        if conflict is not None:
+            kept.append(conflict)
+    return tuple(kept)
 
 
 def _claim(item: object) -> _ModelClaim:

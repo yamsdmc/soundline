@@ -30,6 +30,7 @@ METRICS = (
     "citation_validity",
     "citation_recall",
     "abstention_precision",
+    "conflict_rate",
 )
 OPERATIONS = ("latency_ms", "tokens_in", "tokens_out")
 

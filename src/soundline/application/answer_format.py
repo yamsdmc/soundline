@@ -3,7 +3,8 @@
 from soundline.application.ports import OutputFormat
 
 # The answer contract of docs/spec/05-generation.md as a strict JSON schema: both fields are
-# always present, `insufficient_evidence` is null when the model answers.
+# always present, `insufficient_evidence` is null when the model answers, `conflicts` is
+# empty unless evidence items disagree.
 ANSWER_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
@@ -31,8 +32,20 @@ ANSWER_SCHEMA: dict[str, object] = {
             },
         },
         "insufficient_evidence": {"type": ["string", "null"]},
+        "conflicts": {  # GEN-090
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "about": {"type": "string"},
+                    "evidence_ids": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["about", "evidence_ids"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["claims", "insufficient_evidence"],
+    "required": ["claims", "insufficient_evidence", "conflicts"],
     "additionalProperties": False,
 }
 

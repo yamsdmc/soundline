@@ -111,6 +111,15 @@ Verification compares a quote with the cited evidence text, under a **matching l
 
 - **GEN-080** To measure what verification brings (EVL-092), it MAY be disabled with `verify = false`. Every citation to a known evidence item is then kept as the model wrote it: when its quote fails verification, it is shown with the model's quote, at the span of the whole evidence item, and flagged `verified: false`. Claims without any verified citation are kept, so the answer is `ANSWERED` unless the model declares the evidence insufficient. Citations to unknown evidence IDs are still removed: nothing can be shown for them. This setting exists for evaluation; documentation MUST NOT present it as a production option.
 
+### Conflicting evidence
+
+Verification proves that a source says something, not that the source is right. The trust benchmark (EVL-092) showed the gap: a planted page saying "50 %" was quoted next to the official "10 %", as two equally supported claims. When sources disagree, the user must be told.
+
+- **GEN-090** The model MAY report **conflicts**: evidence items that disagree on what the question asks, each as `{"about": "<what they disagree on>", "evidence_ids": ["E1", "E3"]}`. The prompt asks the model not to choose between disagreeing items, but to state each version as its own cited claim and to report the conflict.
+- **GEN-091** A reported conflict is kept only if, among the evidence items it names, the ones cited by the answer's shown claims come from **at least two different documents**. Unknown IDs and uncited items are ignored. A conflict between passages of a single document is dropped: it is more often a condition (two cases of one rule) than a disagreement. A kept conflict lists the shown citations from the evidence items it names.
+- **GEN-092** Conflicts MUST be shown with the answer: the CLI prints `Sources disagree on <about>: [n] [m]` after the answer text, the JSON output lists them (`about` and the citation numbers), and the citation viewer (CLI-007) marks them. Conflicts never change the claims or the status.
+- **GEN-093** A missing or malformed `conflicts` field is read as no conflict: it never makes an answer invalid (GEN-020).
+
 ## Invariants
 
 - **INV-GEN-1** Every citation in an `ANSWERED` or `PARTIAL` answer has a quote that is a substring of its document's normalized text at its resolved span: `doc.normalized_text[c.start:c.end] == c.quote`.

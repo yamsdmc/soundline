@@ -105,6 +105,8 @@ def generation_metrics(
         metrics["false_answer_rate"] = 0.0 if abstained else 1.0  # EVL-003
     if abstained:
         metrics["abstention_precision"] = 0.0 if answerable else 1.0
+    else:
+        metrics["conflict_rate"] = 1.0 if answer.conflicts else 0.0  # GEN-090
     shown = [citation for claim in answer.claims for citation in claim.citations]
     verified = [citation for citation in shown if citation.verified]
     supported = [claim for claim in answer.claims if any(c.verified for c in claim.citations)]

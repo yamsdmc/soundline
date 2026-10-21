@@ -9,7 +9,7 @@ def answer_text(answer: Answer) -> str:
     if answer.status is AnswerStatus.ABSTAINED:
         reason = answer.abstention_reason.value if answer.abstention_reason else "unknown"
         return f"No answer ({reason}). {answer.abstention_message or ''}".rstrip()
-    lines = [answer.text, ""]
+    lines = [answer.text, *conflict_lines(answer), ""]
     for number, citation in enumerate(answer.citations, 1):
         where = " > ".join(citation.section_path)
         label = PurePosixPath(citation.source).name + (f", {where}" if where else "")
@@ -19,3 +19,12 @@ def answer_text(answer: Answer) -> str:
         lines += ["", f"{answer.status.value}: unsupported claims were removed:"]
         lines += [f"  - {claim}" for claim in answer.dropped_claims]
     return "\n".join(lines)
+
+
+def conflict_lines(answer: Answer) -> list[str]:
+    """One line per pair of disagreeing sources, by citation number (GEN-092)."""
+    return [
+        f"Sources disagree on {conflict.about}: "
+        + " ".join(f"[{answer.citations.index(c) + 1}]" for c in conflict.citations)
+        for conflict in answer.conflicts
+    ]
