@@ -10,6 +10,7 @@ import sqlite_vec
 
 from soundline.application.ports import StoredDocument
 from soundline.domain.chunks import Chunk
+from soundline.domain.errors import IndexMismatchError
 from soundline.domain.filters import And, Compare, Exists, Filter, Member, Not, Or, Scalar
 from soundline.domain.manifest import Manifest
 from soundline.domain.quotes import Span
@@ -147,17 +148,23 @@ def open_database(path: str) -> sqlite3.Connection:
     return connection
 
 
-_COLUMNS = "source, text, start_offset, end_offset, metadata, section_path"
+_COLUMNS = "source, text, start_offset, end_offset, metadata, section_path, pages"
+_PLACEHOLDERS = ", ".join("?" * (len(_COLUMNS.split(",")) + 1))
 
 
-def _chunk(row: tuple[str, str, int, int, str, str]) -> Chunk:
-    source, text, start, end, metadata, section_path = row
+def _chunk(row: tuple[str, str, int, int, str, str, str]) -> Chunk:
+    source, text, start, end, metadata, section_path, pages = row
     return Chunk(
-        source, text, Span(start, end), json.loads(metadata), tuple(json.loads(section_path))
+        source,
+        text,
+        Span(start, end),
+        json.loads(metadata),
+        tuple(json.loads(section_path)),
+        tuple((page, offset) for page, offset in json.loads(pages)),
     )
 
 
-def _values(chunk: Chunk) -> tuple[str, str, int, int, str, str]:
+def _values(chunk: Chunk) -> tuple[str, str, int, int, str, str, str]:
     """Column values in `_COLUMNS` order."""
     return (
         chunk.source,
@@ -166,7 +173,18 @@ def _values(chunk: Chunk) -> tuple[str, str, int, int, str, str]:
         chunk.span.end,
         json.dumps(chunk.metadata),
         json.dumps(chunk.section_path),
+        json.dumps(chunk.pages),
     )
+
+
+def _require_pages_column(connection: sqlite3.Connection, table: str) -> None:
+    """Indexes built before page locations (ING-047) lack the column: say how to rebuild."""
+    columns = [row[1] for row in connection.execute(f"pragma table_info({table})")]
+    if columns and "pages" not in columns:
+        raise IndexMismatchError(
+            "this index was built by an older Soundline without page locations;"
+            " delete its directory and ingest again"
+        )
 
 
 def _where(condition: Filter | None) -> _Sql:
@@ -184,13 +202,14 @@ class SqliteLexicalIndex:
             "create virtual table if not exists chunk_fts using fts5("
             " text, source unindexed, chunk_id unindexed,"
             " start_offset unindexed, end_offset unindexed, metadata unindexed,"
-            " section_path unindexed,"
+            " section_path unindexed, pages unindexed,"
             " tokenize = 'unicode61')"
         )
+        _require_pages_column(self._db, "chunk_fts")
 
     def add(self, chunk: Chunk) -> None:
         self._db.execute(
-            f"insert into chunk_fts(chunk_id, {_COLUMNS}) values (?, ?, ?, ?, ?, ?, ?)",
+            f"insert into chunk_fts(chunk_id, {_COLUMNS}) values ({_PLACEHOLDERS})",
             (chunk.id, *_values(chunk)),
         )
 
@@ -226,8 +245,9 @@ class SqliteVectorIndex:
             "create virtual table if not exists chunk_vec using vec0("
             f" embedding float[{dimension}] distance_metric=cosine,"
             " +source text, +text text, +start_offset integer, +end_offset integer,"
-            " +metadata text, +section_path text)"
+            " +metadata text, +section_path text, +pages text)"
         )
+        _require_pages_column(self._db, "chunk_vec")
 
     def add(self, chunk: Chunk, vector: tuple[float, ...]) -> None:
         if len(vector) != self._dimension:
@@ -235,7 +255,7 @@ class SqliteVectorIndex:
                 f"vector dimension {len(vector)} differs from the index dimension {self._dimension}"
             )
         self._db.execute(
-            f"insert into chunk_vec(embedding, {_COLUMNS}) values (?, ?, ?, ?, ?, ?, ?)",
+            f"insert into chunk_vec(embedding, {_COLUMNS}) values ({_PLACEHOLDERS})",
             (sqlite_vec.serialize_float32(list(vector)), *_values(chunk)),
         )
 

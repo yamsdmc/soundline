@@ -19,6 +19,8 @@ class Element:
 @dataclass(frozen=True)
 class ParsedDocument(NormalizedText):
     elements: tuple[Element, ...] = ()
+    pages: tuple[tuple[int, int], ...] = ()
+    """(page number, offset where it starts in the text), for paged formats (ING-025)."""
 
 
 @dataclass(frozen=True)

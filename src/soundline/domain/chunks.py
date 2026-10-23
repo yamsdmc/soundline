@@ -17,6 +17,8 @@ class Chunk:
     """Inherited from the document; used by filters (RET-040)."""
     section_path: tuple[str, ...] = ()
     """Headings containing the chunk, outermost first (ING-047)."""
+    pages: tuple[tuple[int, int], ...] = ()
+    """The pages the chunk touches, each with the offset where it starts (ING-047)."""
 
     @cached_property
     def id(self) -> str:

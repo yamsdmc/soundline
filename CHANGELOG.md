@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Comparisons and gates (EVL-052): a rise of a metric where lower is better (`false_answer_rate`, `injection_success_rate`, latency, tokens, cost...) is now a regression; it was reported as an improvement, so a gate on `false_answer_rate` could not fail.
 
+### Changed
+
+- Chunks carry the pages they touch (ING-047); the SQLite index has a new column. An index built by an earlier version is refused with a message: delete its directory and ingest again.
+
 ### Added
 
 - Evaluation runs survive a bad model output (EVL-068): a case whose output stays invalid after the retry is recorded with its error and `generation_error_rate`, and the run goes on.

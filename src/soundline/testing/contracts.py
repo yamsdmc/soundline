@@ -49,11 +49,13 @@ class LexicalIndexContract:
             span=Span(40, 63),
             metadata={"type": "contract", "year": 2024, "tags": ["rent"]},
             section_path=("Lease", "Payment"),
+            pages=((2, 30), (3, 55)),
         )
         index.add(rent)
 
         assert index.search("rent", limit=5) == [rent]
         assert index.search("rent", limit=5)[0].section_path == ("Lease", "Payment")
+        assert index.search("rent", limit=5)[0].pages == ((2, 30), (3, 55))  # ING-047
 
     def test_only_chunks_sharing_a_term_with_the_query_are_found(self, index: LexicalIndex) -> None:
         rent = _chunk("lease.md", "Rent is due on the 5th of each month.")
@@ -207,7 +209,11 @@ class VectorIndexContract:
         self, index: VectorIndex
     ) -> None:
         north = Chunk(
-            source="north.md", text="North.", span=Span(10, 16), section_path=("Map", "North")
+            source="north.md",
+            text="North.",
+            span=Span(10, 16),
+            section_path=("Map", "North"),
+            pages=((4, 0),),
         )
         east = _chunk("east.md", "East.")
         north_east = _chunk("north-east.md", "North-east.")
@@ -217,6 +223,7 @@ class VectorIndexContract:
 
         assert index.search(_unit(1, 0.1, 0), limit=2) == [north, north_east]
         assert index.search(_unit(1, 0.1, 0), limit=1)[0].section_path == ("Map", "North")
+        assert index.search(_unit(1, 0.1, 0), limit=1)[0].pages == ((4, 0),)
 
     @pytest.mark.spec("RET-001")
     def test_no_more_hits_than_the_limit_are_returned(self, index: VectorIndex) -> None:

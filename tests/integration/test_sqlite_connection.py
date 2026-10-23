@@ -1,8 +1,10 @@
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
 
-from soundline.adapters.stores.sqlite import choose_binding, open_database
+from soundline.adapters.stores.sqlite import SqliteLexicalIndex, choose_binding, open_database
+from soundline.domain.errors import IndexMismatchError
 
 
 class _Connection:
@@ -56,3 +58,16 @@ def test_every_database_of_a_process_uses_the_same_sqlite_binding():
     first, second = open_database(":memory:"), open_database(":memory:")
 
     assert type(first) is type(second)
+
+
+@pytest.mark.spec("ING-047", "STO-010")
+def test_an_index_built_before_page_locations_asks_to_be_rebuilt():
+    database = sqlite3.connect(":memory:")
+    database.execute(
+        "create virtual table chunk_fts using fts5(text, source unindexed, chunk_id unindexed,"
+        " start_offset unindexed, end_offset unindexed, metadata unindexed,"
+        " section_path unindexed)"
+    )
+
+    with pytest.raises(IndexMismatchError, match="ingest again"):
+        SqliteLexicalIndex(database)
