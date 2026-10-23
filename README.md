@@ -75,8 +75,8 @@ soundline ask "When is the rent due and what happens if I'm late?" --open
 Rent is due on the 5th of each month [1]. Payments more than 10 days late
 incur a 5% penalty on the monthly amount [2].
 
-[1] lease-2024.pdf, p.3: "Le loyer est payable le 5 de chaque mois"
-[2] lease-2024.pdf, p.7: "une pénalité de 5 % du montant mensuel"
+[1] lease-2024.pdf, p. 3: "Le loyer est payable le 5 de chaque mois"
+[2] lease-2024.pdf, p. 7: "une pénalité de 5 % du montant mensuel"
 ```
 
 `--open` opens a self-contained page where each claim sits next to its source page, with the quote highlighted.

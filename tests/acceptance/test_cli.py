@@ -10,6 +10,7 @@ from typer.testing import CliRunner, Result
 from soundline.domain.usage import TokenUsage
 from soundline.interfaces.cli import app
 from soundline.testing import ScriptedLanguageModel
+from soundline.testing.pdf import make_pdf
 
 type Run = Callable[..., Result]
 
@@ -427,3 +428,25 @@ def test_a_typo_in_soundline_toml_is_a_configuration_error(
 
     assert result.exit_code == 3
     assert "unknown key 'retrieval.kk'; did you mean 'retrieval.k'?" in result.stderr
+
+
+@pytest.mark.spec("ING-025", "ING-026", "ING-047")
+def test_pdfs_are_ingested_with_their_pages_and_a_scan_is_skipped_with_a_reason(
+    run: Run, tmp_path: Path
+):
+    folder = tmp_path / "pdfs"
+    folder.mkdir()
+    lease = [["Bail d'habitation"], ["Le loyer est payable le 5 de chaque mois."]]
+    (folder / "bail.pdf").write_bytes(make_pdf(lease))
+    (folder / "scan.pdf").write_bytes(make_pdf([[], []]))
+    (folder / "broken.pdf").write_bytes(b"%PDF-1.4 truncated")
+
+    report = run("ingest", str(folder))
+    result = run("search", "loyer payable", "--json", "-k", "1")
+
+    assert report.exit_code == 5, report.output  # partial success (CLI-001)
+    assert "scan.pdf (no_text_layer)" in report.stdout
+    assert "broken.pdf (unreadable_document)" in report.stdout
+    hit = json.loads(result.stdout)["hits"][0]
+    assert hit["source"].endswith("bail.pdf")
+    assert hit["pages"] == [1, 2]  # first and last page of the chunk

@@ -23,6 +23,7 @@ from soundline.application.ports import (
     GenerationCache,
     Index,
     LanguageModel,
+    PageReader,
     RunStore,
     SourceReader,
 )
@@ -174,7 +175,11 @@ class Soundline:
     def ingest(self, inputs: Sequence[str | Path]) -> IngestionReport:
         """Files and directories, recursively. Never deletes anything (ING-011)."""
         return ingest_sources(
-            [str(i) for i in inputs], self._reader, self._ingestor, self._documents
+            [str(i) for i in inputs],
+            self._reader,
+            self._ingestor,
+            self._documents,
+            page_reader=_pdf_pages(),
         )
 
     def sync(self, inputs: Sequence[str | Path]) -> IngestionReport:
@@ -185,6 +190,7 @@ class Soundline:
             self._ingestor,
             self._documents,
             delete_missing=True,
+            page_reader=_pdf_pages(),
         )
 
     def viewer_html(self, answer: Answer) -> str:
@@ -409,6 +415,12 @@ def llm_from_spec(spec: str) -> LanguageModel:
 
 def _default_embedder() -> Embedder:
     return embedder_from_spec(DEFAULT_EMBEDDER)
+
+
+def _pdf_pages() -> PageReader:
+    from soundline.adapters.parsers.pypdf_pages import PypdfPages  # noqa: PLC0415
+
+    return PypdfPages()
 
 
 def _local_files() -> SourceReader:

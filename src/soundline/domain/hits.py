@@ -34,6 +34,9 @@ class Hit:
             "section_path": list(self.section_path),
             "span": [self.chunk.span.start, self.chunk.span.end],
             "metadata": dict(self.chunk.metadata),
+            "pages": [self.chunk.pages[0][0], self.chunk.pages[-1][0]]  # ING-047
+            if self.chunk.pages
+            else None,
         }
 
 

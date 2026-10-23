@@ -22,6 +22,7 @@ dependencies = [
     "fastembed>=0.7",
     # Fallback SQLite binding for Pythons built without extension loading (ADR 0012).
     # No Windows wheels exist; Windows CPython builds load extensions natively.
+    "pypdf>=6",
     "sqlean-py>=3.47; sys_platform != 'win32'",
     "sqlite-vec>=0.1.6",
     "typer>=0.15",

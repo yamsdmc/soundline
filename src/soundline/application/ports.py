@@ -156,6 +156,13 @@ class SourceReader(Protocol):
     def read(self, uri: str) -> bytes: ...
 
 
+class PageReader(Protocol):
+    def pages(self, data: bytes) -> list[str]:
+        """The text of each page of a paged document, such as a PDF's text layer (ING-025).
+        Raises UnreadableDocumentError for a corrupt or encrypted file."""
+        ...
+
+
 class RunStore(Protocol):
     def save(self, run: EvalRun) -> str:
         """Returns where the run was stored."""

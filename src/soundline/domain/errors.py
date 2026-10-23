@@ -29,3 +29,9 @@ class GenerationError(SoundlineError):
     """The model did not produce a usable answer, even after one corrective retry (GEN-020)."""
 
     code = "invalid_model_output"
+
+
+class UnreadableDocumentError(SoundlineError):
+    """A file whose format is supported but whose content cannot be read (corrupt, encrypted)."""
+
+    code = "unreadable_document"

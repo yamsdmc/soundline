@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- PDF files (ING-025, ING-026): `ingest` reads their text layer page by page (pypdf, now a dependency); a scan without text is skipped as `no_text_layer`, a corrupt or encrypted file fails as `unreadable_document`. Search hits carry `pages`. `soundline.testing.pdf.make_pdf` builds small text PDFs for tests.
 - Paged documents (ING-025, ING-047): `Soundline.ingest_pages(source, pages)` indexes one string per page; citations name their page (`[1] bail.pdf, p. 2: "…"`, `page` in JSON, shown in the viewer).
 - Evaluation runs survive a bad model output (EVL-068): a case whose output stays invalid after the retry is recorded with its error and `generation_error_rate`, and the run goes on.
 - `soundline.toml` (CFG-001 to CFG-005): store path, embedding and generation models, prompt, operator instructions, history budget, `retrieval.k`, default judge and prices, also read from `[tool.soundline]` in `pyproject.toml` or the file named by `SOUNDLINE_CONFIG`. Environment variables (`SOUNDLINE_RETRIEVAL__K=8`) override the file. Unknown keys are errors with a suggestion; secrets are refused. `soundline config show` prints each value with its source.
