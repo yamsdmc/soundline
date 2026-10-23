@@ -104,6 +104,7 @@ def test_the_json_form_lists_claims_with_their_citations_and_the_proposed_count(
                     "section_path": [],
                     "approximate": False,
                     "verified": True,
+                    "page": None,
                 }
             ],
         }

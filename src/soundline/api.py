@@ -164,6 +164,13 @@ class Soundline:
         """
         return self._ingestor.ingest_text(source, text, metadata)
 
+    def ingest_pages(
+        self, source: str, pages: Sequence[str], metadata: Metadata | None = None
+    ) -> IngestionStatus:
+        """A paged document, one string per page, such as a PDF's text layer extracted by
+        your own tool; citations then name their page (ING-025, ING-047)."""
+        return self._ingestor.ingest_pages(source, pages, metadata)
+
     def ingest(self, inputs: Sequence[str | Path]) -> IngestionReport:
         """Files and directories, recursively. Never deletes anything (ING-011)."""
         return ingest_sources(

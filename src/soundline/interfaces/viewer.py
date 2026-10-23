@@ -100,6 +100,8 @@ def _source(number: int, citation: Citation, document_text: Callable[[str], str]
     before = text[max(0, start - _CONTEXT_CHARS) : start]
     after = text[end : end + _CONTEXT_CHARS]
     where = escape(citation.source.rsplit("/", 1)[-1])
+    if citation.page is not None:
+        where += f" &middot; p. {citation.page}"
     if citation.section_path:
         where += " &middot; " + " &rsaquo; ".join(escape(part) for part in citation.section_path)
     badge = '<span class="badge">approximate</span>' if citation.approximate else ""

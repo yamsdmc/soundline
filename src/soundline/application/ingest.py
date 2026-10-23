@@ -1,5 +1,5 @@
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -11,6 +11,7 @@ from soundline.domain.documents import ParsedDocument
 from soundline.domain.filters import Metadata
 from soundline.domain.html import parse_html
 from soundline.domain.markdown import parse_markdown
+from soundline.domain.pdf import PAGE_BREAK, pages_within, parse_pdf_pages
 
 
 class IngestionStatus(Enum):
@@ -70,13 +71,30 @@ class Ingestor:
         metadata: Metadata | None = None,
         media_type: str = "text/markdown",
     ) -> IngestionStatus:
+        return self._index_document(source, text, lambda: PARSERS[media_type](text), metadata)
+
+    def ingest_pages(
+        self, source: str, pages: Sequence[str], metadata: Metadata | None = None
+    ) -> IngestionStatus:
+        """A paged document, such as a PDF's text layer, one string per page (ING-025)."""
+        return self._index_document(
+            source, PAGE_BREAK.join(pages), lambda: parse_pdf_pages(pages), metadata
+        )
+
+    def _index_document(
+        self,
+        source: str,
+        raw: str,
+        parse: Callable[[], ParsedDocument],
+        metadata: Metadata | None,
+    ) -> IngestionStatus:
         check_pipeline(self._index.manifest, self._manifest)  # STO-010
-        revision = hashlib.sha256(text.encode()).hexdigest()
+        revision = hashlib.sha256(raw.encode()).hexdigest()
         previous = self._documents.get(source)
         if previous and previous.revision == revision:
             return IngestionStatus.UNCHANGED  # ING-007: no parse, no embedding, no write
 
-        document = PARSERS[media_type](text)
+        document = parse()
         chunks = [
             Chunk(
                 source=source,
@@ -84,6 +102,7 @@ class Ingestor:
                 span=planned.span,
                 metadata=metadata or {},
                 section_path=planned.section_path,
+                pages=pages_within(planned.span, document.pages),  # ING-047
             )
             for planned in chunk_document(
                 document,

@@ -36,6 +36,7 @@ from soundline.domain.events import (
     RetrievalCompleted,
     StreamError,
 )
+from soundline.domain.pdf import page_at
 from soundline.domain.usage import Price, StageUsage, Usage, price_for
 from soundline.domain.verification import Method, verify_quote
 
@@ -312,11 +313,26 @@ def _verified(claim: _ModelClaim, evidence: Mapping[str, Chunk], verify: bool) -
         if result.method is Method.FAILED:
             if not verify:
                 citations.append(
-                    Citation(chunk.source, quote, chunk.span, False, chunk.section_path, False)
+                    Citation(
+                        chunk.source,
+                        quote,
+                        chunk.span,
+                        False,
+                        chunk.section_path,
+                        False,
+                        page_at(chunk.pages, chunk.span.start),
+                    )
                 )
             continue
         span = result.span.shifted_by(chunk.span.start)
         citations.append(
-            Citation(chunk.source, result.quote, span, result.approximate, chunk.section_path)
+            Citation(
+                chunk.source,
+                result.quote,
+                span,
+                result.approximate,
+                chunk.section_path,
+                page=page_at(chunk.pages, span.start),  # GEN-031
+            )
         )
     return Claim(claim.text, tuple(citations))

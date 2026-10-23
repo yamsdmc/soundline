@@ -12,7 +12,8 @@ def answer_text(answer: Answer) -> str:
     lines = [answer.text, *conflict_lines(answer), ""]
     for number, citation in enumerate(answer.citations, 1):
         where = " > ".join(citation.section_path)
-        label = PurePosixPath(citation.source).name + (f", {where}" if where else "")
+        page = f", p. {citation.page}" if citation.page is not None else ""
+        label = PurePosixPath(citation.source).name + page + (f", {where}" if where else "")
         marker = " (approximate)" if citation.approximate else ""
         lines.append(f'[{number}] {label}: "{citation.quote}"{marker}')  # GEN-042
     if answer.dropped_claims:

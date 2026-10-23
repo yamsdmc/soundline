@@ -38,6 +38,8 @@ class Citation:
     verified: bool = True
     """False only with verification disabled, for benchmarking (GEN-080): the quote is the
     model's and the span is the whole evidence item."""
+    page: int | None = None
+    """The page the quote starts on, for paged documents such as PDFs (GEN-031)."""
 
 
 @dataclass(frozen=True)
@@ -207,4 +209,5 @@ def _citation_to_dict(citation: Citation) -> dict[str, object]:
         "section_path": list(citation.section_path),
         "approximate": citation.approximate,
         "verified": citation.verified,
+        "page": citation.page,
     }
